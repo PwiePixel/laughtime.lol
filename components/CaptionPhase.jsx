@@ -359,11 +359,11 @@ function Editor({ game, done, total }) {
   const texted = hasText(captions);
   const canSubmit = texted && hasMedia;
   const allDone = done === total;
-  const duo = gameId === 'swap' && hand.length > 1;
   const twoPlayers = state.players.filter((p) => p.connected).length <= 2;
   const progressText = t('caption.progress', { done, total });
   const sub = hunt ? t('caption.huntSub', { n: hunt.max }) : t('caption.sub');
-  const subShort = t(hunt ? 'caption.huntShort' : 'caption.subShort');
+  const duo = gameId === 'swap' && hand.length > 1;
+  const subShort = t(hunt ? 'caption.huntShort' : duo ? 'swap.pickShort' : 'caption.subShort');
 
   return (
     <div className={`phase caption-phase has-bar game-${gameId} ${cap.submitted ? 'is-submitted' : ''} ${hand.length > 1 ? 'has-hand' : ''}`}>
