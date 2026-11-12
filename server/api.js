@@ -27,6 +27,7 @@ import {
 import { getConfig } from './config.js';
 import { isAdmin as isAdminUser } from './accounts.js';
 import { handleActivityApi, isActivityRequest } from './activity.js';
+import { exchangeCode, fetchUser } from './discord.js';
 import { HttpError, checkOrigin, clientIp, createLimiter, isHttps, json, parseCookies, readJson, redirect, serializeCookie } from './http.js';
 import { apiCache } from './lib/respond.js';
 import { browseMedia, cleanQuery, isBlocked, searchMedia } from './media/search.js';
@@ -123,26 +124,9 @@ async function discordCallback(req, res, ctx) {
 
   let profile;
   try {
-    const tokenRes = await fetch(`${d.apiUrl}/oauth2/token`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        client_id: d.clientId,
-        client_secret: d.clientSecret,
-        grant_type: 'authorization_code',
-        code: params.get('code'),
-        redirect_uri: d.redirectUri,
-      }),
-      signal: AbortSignal.timeout(10000),
-    });
-    if (!tokenRes.ok) throw new Error(`token ${tokenRes.status}`);
-    const tok = await tokenRes.json();
-    const meRes = await fetch(`${d.apiUrl}/users/@me`, {
-      headers: { Authorization: `Bearer ${tok.access_token}` },
-      signal: AbortSignal.timeout(10000),
-    });
-    if (!meRes.ok) throw new Error(`me ${meRes.status}`);
-    profile = await meRes.json();
+    // one queued request each (server/discord.js): the code is never sent twice
+    const tok = await exchangeCode({ clientId: d.clientId, clientSecret: d.clientSecret, code: params.get('code'), redirectUri: d.redirectUri });
+    profile = await fetchUser(tok.access_token);
   } catch (err) {
     console.warn('[auth] discord login failed:', err.message);
     return fail('discord_failed');

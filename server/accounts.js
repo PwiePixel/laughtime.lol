@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import { promisify } from 'node:util';
 import { randomAvatar, sanitizeAvatar, sanitizeName } from '../lib/shared.js';
 import { getConfig } from './config.js';
+import { discordApiUrl } from './discord.js';
 import { all, get, run, sha256, transaction } from './db.js';
 import { removeUserUploads } from './uploads.js';
 import { HttpError, parseCookies, serializeCookie } from './http.js';
@@ -255,6 +256,6 @@ export function discordConfig() {
     clientSecret,
     redirectUri: process.env.DISCORD_REDIRECT_URI || `${cfg.publicUrl.replace(/\/$/, '')}/api/auth/discord/callback`,
     authorizeUrl: process.env.DISCORD_AUTHORIZE_URL || 'https://discord.com/oauth2/authorize',
-    apiUrl: (process.env.DISCORD_API_URL || 'https://discord.com/api').replace(/\/$/, ''),
+    apiUrl: discordApiUrl(),
   };
 }

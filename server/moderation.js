@@ -8,6 +8,7 @@ import { ROOT } from './config.js';
 import { all, get, run, transaction } from './db.js';
 import { HttpError } from './http.js';
 import { UPLOAD_DIR } from './uploads.js';
+import { notifyModerators } from './webhook.js';
 
 // ---------------------------------------------------------------------------
 // Moderation: reports from players, bans / restrictions, admin log and the
@@ -367,6 +368,8 @@ export async function createReport({ reporter, target, reason, comment = '', roo
     ctx ? JSON.stringify(ctx) : null,
     Date.now(),
   );
+  // optional heads-up in the moderators' Discord channel (category only, coalesced)
+  notifyModerators('report', reason);
   return { ok: true };
 }
 

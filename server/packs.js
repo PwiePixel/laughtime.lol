@@ -6,6 +6,7 @@ import { isAllowedUrl, proxyUrl } from './proxy.js';
 import { findKnownItem, isBlocked } from './media/search.js';
 import { getConfig } from './config.js';
 import { removeFile, storeFile, uploadMedia } from './uploads.js';
+import { notifyModerators } from './webhook.js';
 
 // ---------------------------------------------------------------------------
 // Meme Studio: players with an account collect templates & clips into packs
@@ -156,6 +157,7 @@ function refreshMeta(id) {
   const row = get('SELECT public, review FROM packs WHERE id = ?', id);
   if (row?.public && unapprovedCount(id) > 0) {
     run("UPDATE packs SET public = 0, review = 'pending', review_note = '' WHERE id = ?", id);
+    notifyModerators('pack_review');
   } else if (row && row.review === 'pending' && unapprovedCount(id) === 0) {
     // nothing left to review (uploads removed): public again
     run("UPDATE packs SET public = 1, review = 'none' WHERE id = ?", id);
@@ -240,6 +242,7 @@ export function updatePack(id, user, body = {}) {
       fields.public = 0;
       fields.review = 'pending';
       fields.review_note = '';
+      if (row.review !== 'pending') notifyModerators('pack_review');
     } else {
       fields.public = body.public ? 1 : 0;
       if (!body.public && row.review === 'pending') fields.review = 'none';

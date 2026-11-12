@@ -22,6 +22,7 @@ import {
   updateUser,
 } from './accounts.js';
 import { getConfig } from './config.js';
+import { DiscordError, activityInstanceUsers, exchangeCode, fetchUser } from './discord.js';
 import { activityRoom } from './game.js';
 import { HttpError, createLimiter, json, readJson } from './http.js';
 import { sanitizeName } from '../lib/shared.js';
@@ -70,35 +71,11 @@ export function isActivityOrigin(origin) {
   return Boolean(enabled && proxyHost && hostOf(origin) === proxyHost);
 }
 
-async function discordFetch(url, init = {}) {
-  const res = await fetch(url, { ...init, signal: AbortSignal.timeout(10_000) });
-  if (res.status === 429) {
-    // respect Discord's rate limit once
-    const wait = Math.min(5, Number(res.headers.get('retry-after')) || 1);
-    await new Promise((r) => setTimeout(r, wait * 1000));
-    return fetch(url, { ...init, signal: AbortSignal.timeout(10_000) });
-  }
-  return res;
-}
-
 // --- instance verification (optional, needs DISCORD_BOT_TOKEN) ------------------
 
-const instanceCache = new Map(); // instanceId -> { at, users: Set }
-
-async function instanceUsers(cfg, instanceId, fresh = false) {
-  const hit = instanceCache.get(instanceId);
-  if (hit && !fresh && Date.now() - hit.at < 30_000) return hit.users;
-  const res = await discordFetch(`${cfg.apiUrl}/applications/${cfg.clientId}/activity-instances/${encodeURIComponent(instanceId)}`, {
-    headers: { Authorization: `Bot ${cfg.botToken}` },
-  });
-  if (res.status === 404) return null;
-  if (!res.ok) throw new Error(`activity-instances ${res.status}`);
-  const data = await res.json();
-  const users = new Set((data.users || []).map(String));
-  instanceCache.set(instanceId, { at: Date.now(), users });
-  if (instanceCache.size > 2000) instanceCache.delete(instanceCache.keys().next().value);
-  return users;
-}
+// the lookups are cached and de-duplicated in discord.js
+const instanceUsers = (cfg, instanceId, fresh = false) =>
+  activityInstanceUsers({ clientId: cfg.clientId, botToken: cfg.botToken, instanceId, fresh });
 
 async function verifyInstance(cfg, instanceId, discordId) {
   if (!cfg.botToken) return; // not configured: trust the (unguessable) instance id
@@ -128,23 +105,11 @@ async function exchangeToken(req, res, ctx) {
   let tok;
   let profile;
   try {
-    const tokenRes = await discordFetch(`${cfg.apiUrl}/oauth2/token`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        client_id: cfg.clientId,
-        client_secret: cfg.clientSecret,
-        grant_type: 'authorization_code',
-        code,
-      }),
-    });
-    if (!tokenRes.ok) throw new HttpError(401, 'discord_failed');
-    tok = await tokenRes.json();
-    const meRes = await discordFetch(`${cfg.apiUrl}/users/@me`, { headers: { Authorization: `Bearer ${tok.access_token}` } });
-    if (!meRes.ok) throw new HttpError(401, 'discord_failed');
-    profile = await meRes.json();
+    tok = await exchangeCode({ clientId: cfg.clientId, clientSecret: cfg.clientSecret, code });
+    profile = await fetchUser(tok.access_token);
   } catch (err) {
-    if (err instanceof HttpError) throw err;
+    // Discord answered, but refused the code or the token
+    if (err instanceof DiscordError && err.status) throw new HttpError(401, 'discord_failed');
     console.warn('[activity] token exchange failed:', err.message);
     throw new HttpError(502, 'discord_failed');
   }
@@ -165,6 +130,8 @@ async function exchangeToken(req, res, ctx) {
   json(res, 200, {
     accessToken: tok.access_token,
     scope: tok.scope || '',
+    // lets the activity keep both for a reload instead of asking Discord again
+    expiresIn: Math.max(0, Math.min(Number(tok.expires_in) || 0, ACTIVITY_SESSION_DAYS * 86400)),
     session,
     isNew,
     user: privateUser(user),
@@ -196,6 +163,8 @@ function activityInfo(res) {
   json(res, 200, {
     enabled: cfg.enabled,
     clientId: cfg.enabled ? cfg.clientId : null,
+    // "Play on Discord" on the website: opens the activity's page in Discord
+    launchUrl: cfg.enabled ? `https://discord.com/activities/${cfg.clientId}` : null,
     publicUrl: getConfig().publicUrl.replace(/\/$/, ''),
     verified: Boolean(cfg.botToken),
   });
