@@ -1873,7 +1873,10 @@ function handleMessage(ws, msg) {
     }
     case 'swap_random': {
       if (room.phase !== 'upload' || !cur || !isSwap(room)) return;
-      const media = randomMedia(room, player.id);
+      // not what somebody already has in this round (or what this player just had)
+      const used = new Set(room.usedMedia);
+      for (const c of cur.contribs.values()) used.add(c.media.id);
+      const media = randomMedia(room, player.id, used);
       warmMedia(media.url);
       return setContribution(room, player, media, { source: 'random' });
     }

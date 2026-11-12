@@ -321,3 +321,24 @@ test('the report limit holds for a connection that keeps changing its id', async
   await flush(20);
   assert.equal(sock.take('reported').length, 1);
 });
+
+test('swap: surprise pictures of one round are all different', async () => {
+  const { players, host } = await env.room(8, { game: 'swap', settings: { rounds: 1, mode: 'images' } });
+  await env.start(host);
+  // everybody asks for a surprise several times, also for another one
+  const seen = new Map();
+  for (let turn = 0; turn < 6; turn++) {
+    for (const p of players.slice(0, 7)) {
+      const before = p.state.upload.mine?.media.id;
+      p.send({ t: 'swap_random' });
+      const now = p.state.upload.mine.media.id;
+      assert.notEqual(now, before, 'another surprise is another picture');
+      seen.set(p, now);
+      assert.equal(new Set(seen.values()).size, seen.size, 'two players hold the same surprise');
+    }
+  }
+  players[7].send({ t: 'swap_random' });
+  await env.advance(2500);
+  assert.equal(host.state.phase, 'caption');
+  for (const p of players) assert.equal(p.state.caption.hand.length, 2);
+});
