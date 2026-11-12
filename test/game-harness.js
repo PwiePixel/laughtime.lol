@@ -120,6 +120,10 @@ export function setupGame(env = {}) {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lt-game-'));
     const db = await import('../server/db.js');
     await db.openDatabase(path.join(dir, 'test.db'));
+    // the first pool load reads its cache files from disk: wait for it in real time,
+    // so that every game in the tests starts within one flush
+    const media = await import('../server/media/index.js');
+    await media.startMediaPool();
     mock.timers.enable({ apis: ['setTimeout', 'Date'], now: START });
     const game = await import('../server/game.js');
     const wss = new EventEmitter();
