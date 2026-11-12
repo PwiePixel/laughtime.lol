@@ -1,1 +1,23 @@
-/* LaughTime v2 – v2 */
+/* ------------------------------------------------------------------
+   LaughTime v2 – shared design tokens for the polish pass.
+   The look stays the same (ink outlines, hard shadows, party colours);
+   these add depth, glow and smoother motion on top of it.
+   ------------------------------------------------------------------ */
+:root {
+  /* glass surfaces on the dark background */
+  --glass-bg: rgba(42, 16, 87, 0.62);
+  --glass-bg-strong: rgba(30, 11, 64, 0.82);
+  --glass-border: rgba(255, 255, 255, 0.16);
+  --glass-blur: 14px;
+  /* glows in the brand colours */
+  --glow-yellow: 0 0 0 1px rgba(255, 210, 63, 0.35), 0 0 26px rgba(255, 210, 63, 0.38);
+  --glow-pink: 0 0 0 1px rgba(255, 79, 163, 0.35), 0 0 26px rgba(255, 79, 163, 0.4);
+  --glow-cyan: 0 0 0 1px rgba(53, 224, 255, 0.35), 0 0 26px rgba(53, 224, 255, 0.38);
+  --glow-green: 0 0 0 1px rgba(124, 255, 107, 0.35), 0 0 26px rgba(124, 255, 107, 0.36);
+  /* motion: only transform/opacity are animated, so everything stays at 60 fps */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --dur-fast: 120ms;
+  --dur: 220ms;
+  --dur-slow: 420ms;
+}

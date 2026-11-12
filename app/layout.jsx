@@ -1,9 +1,10 @@
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import Footer from '@/components/Footer';
 import Header from '@/components/Header';
 import Providers from '@/components/Providers';
 import SanctionGate from '@/components/SanctionGate';
 import PwaBoot from '@/components/v2/PwaBoot';
+import { BETA_COOKIE, betaEnabledFromEnv, betaHostsFromEnv, resolveChannel } from '@/lib/features';
 import { LANG_COOKIE, normalizeLang, translate } from '@/lib/i18n';
 import { memeFont, uiFont } from './fonts';
 import './globals.css';
@@ -56,11 +57,19 @@ export const viewport = {
 export default async function RootLayout({ children }) {
   const store = await cookies();
   const lang = normalizeLang(store.get(LANG_COOKIE)?.value);
+  // main page and beta page are the same app: the channel only switches features on
+  const requestHeaders = await headers();
+  const channel = resolveChannel({
+    host: requestHeaders.get('x-forwarded-host') || requestHeaders.get('host') || '',
+    optedIn: store.get(BETA_COOKIE)?.value === '1',
+    betaHosts: betaHostsFromEnv(process.env),
+    enabled: betaEnabledFromEnv(process.env),
+  });
 
   return (
     <html lang={lang} className={`${uiFont.variable} ${memeFont.variable}`}>
       <body>
-        <Providers lang={lang} memeFontFamily={memeFont.style.fontFamily}>
+        <Providers lang={lang} channel={channel} memeFontFamily={memeFont.style.fontFamily}>
           <div className="bg-dots" aria-hidden="true" />
           <Header />
           <main className="main">

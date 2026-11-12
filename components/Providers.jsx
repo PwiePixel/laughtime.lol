@@ -10,7 +10,7 @@ import { loadProfile, saveProfile } from '@/lib/profile';
 const AppCtx = createContext(null);
 const STREAMER_KEY = 'lt_streamer';
 
-export default function Providers({ lang: initialLang, memeFontFamily, children }) {
+export default function Providers({ lang: initialLang, channel = 'stable', memeFontFamily, children }) {
   const router = useRouter();
   const [lang, setLangState] = useState(normalizeLang(initialLang));
   const [guest, setGuest] = useState(null);
@@ -113,6 +113,8 @@ export default function Providers({ lang: initialLang, memeFontFamily, children 
   const value = useMemo(
     () => ({
       lang,
+      // 'stable' or 'beta' (see lib/features.js)
+      channel,
       setLang,
       t,
       profile,
@@ -131,7 +133,7 @@ export default function Providers({ lang: initialLang, memeFontFamily, children 
       activityMode,
       setActivityMode,
     }),
-    [lang, setLang, t, profile, updateProfile, memeFontFamily, account, refreshAccount, logout, discordEnabled, streamerMode, setStreamerMode, sanction, activityMode],
+    [lang, channel, setLang, t, profile, updateProfile, memeFontFamily, account, refreshAccount, logout, discordEnabled, streamerMode, setStreamerMode, sanction, activityMode],
   );
   return <AppCtx.Provider value={value}>{children}</AppCtx.Provider>;
 }

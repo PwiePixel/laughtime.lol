@@ -73,7 +73,7 @@ function newCode() {
 // rooms that belong to a Discord Activity instance: instanceId -> code
 const activityRooms = new Map();
 
-export function createRoom({ game = 'classic', isPublic = false, activity = null } = {}) {
+export function createRoom({ game = 'classic', isPublic = false, activity = null, channel = 'stable' } = {}) {
   const cfg = getConfig();
   if (rooms.size >= cfg.maxRooms) return null;
   const code = newCode();
@@ -82,6 +82,8 @@ export function createRoom({ game = 'classic', isPublic = false, activity = null
   if (isPublic) settings.maxPlayers = cfg.matchMax;
   const room = {
     code,
+    // release channel of whoever opened the room ('stable' | 'beta', see lib/features.js)
+    channel,
     createdAt: now(),
     hostId: null,
     isPublic,

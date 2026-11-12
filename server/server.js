@@ -5,6 +5,7 @@ import { ROOM_CODE_RE } from '../lib/shared.js';
 import { isAdmin, purgeExpiredSessions, userFromRequest } from './accounts.js';
 import { isActivityRequest } from './activity.js';
 import { handleApi } from './api.js';
+import { requestChannel } from './channel.js';
 import { ROOT, getConfig } from './config.js';
 import { openDatabase } from './db.js';
 import { attachGame, createRoom, handleRoomUpload, publicStats, roomInfo, stats } from './game.js';
@@ -115,7 +116,7 @@ export async function startServer({ dev = false, dir = ROOT } = {}) {
         }
         const sanction = activeSanction({ userId: creator?.id, ipHash: hashIp(clientIp(req, cfg.trustProxy)) });
         if (sanction?.type === 'ban') return json(res, 403, { error: 'banned', sanction });
-        const room = createRoom({ game: body.game });
+        const room = createRoom({ game: body.game, channel: requestChannel(req) });
         if (!room) return json(res, 503, { error: 'server_full' });
         if (body.pack && room.settings.game === 'classic') {
           // "play this pack" from the studio / pack page
@@ -140,6 +141,7 @@ export async function startServer({ dev = false, dir = ROOT } = {}) {
       }
       if (p === '/api/public') {
         return json(res, 200, {
+          channel: requestChannel(req),
           classic: publicStats('classic'),
           hunt: publicStats('hunt'),
           queues: queueSizes(),
@@ -208,6 +210,7 @@ export async function startServer({ dev = false, dir = ROOT } = {}) {
       wss.handleUpgrade(req, socket, head, (ws) => {
         ws.account = user ? { id: user.id, username: user.username, displayName: user.display_name, avatar: user.avatar } : null;
         ws.activity = activity;
+        ws.channel = requestChannel(req);
         ws.ipHash = activity ? null : hashIp(clientIp(req, cfg.trustProxy));
         wss.emit('connection', ws, req);
       });
