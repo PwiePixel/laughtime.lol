@@ -1063,10 +1063,12 @@ function cancelEarlyEnd(room) {
   if (left > 0) setPhaseTimer(room, left, () => endCaption(room));
 }
 
-function endCaption(room) {
+/** `skipped`: the host ended the phase by hand */
+function endCaption(room, { skipped = false } = {}) {
   if (room.phase !== 'caption') return;
   const cur = room.current;
-  if (paced(room)) {
+  // (after a skip nobody had their time: having done nothing yet says nothing then)
+  if (paced(room) && !skipped) {
     // who is connected but did nothing at all this round is away from now on
     for (const p of connectedPlayers(room)) if (cur.subs.has(p.id) && p.actedRound !== room.round) p.away = true;
   }
@@ -1883,7 +1885,7 @@ function handleMessage(ws, msg) {
         clearTimer(room);
         return room.round >= room.settings.rounds ? endGame(room) : startRound(room);
       }
-      if (room.phase === 'caption') return endCaption(room);
+      if (room.phase === 'caption') return endCaption(room, { skipped: true });
       if (room.phase === 'upload') return endUpload(room);
       return;
     case 'again':

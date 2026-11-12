@@ -67,3 +67,32 @@ test('a report cannot be used to ask who made a meme while the vote runs', async
   assert.equal(await report(watcher, { target: 'result', pid: second.pid, reason: 'meme' }), 0);
   assert.equal(await report(watcher, { target: 'result', round: 1, pid: second.pid, reason: 'meme' }), 1);
 });
+
+test('pacing: skipping the caption phase makes nobody away - only a clock that ran out does', async () => {
+  const { players, host } = await env.room(3, { game: 'same', channel: 'beta', settings: { rounds: 2, captionTime: 30 } });
+  const [ann, ben, cleo] = players;
+  await env.start(host);
+  await env.advance(3000);
+  ann.send({ t: 'submit', captions: caption('quick') });
+  // the host does not want to wait: Ben and Cleo had three seconds, that says nothing about them
+  ann.send({ t: 'skip' });
+  await flush();
+  assert.equal(ann.state.phase, 'vote');
+  assert.deepEqual(ann.state.players.map((p) => p.away), [false, false, false]);
+  // so the vote still waits for both of them
+  ben.send({ t: 'vote', score: 4 });
+  await env.advance(900);
+  assert.equal(ann.state.vote.stage, 'rating');
+  cleo.send({ t: 'vote', score: 4 });
+  await env.advance(900);
+  assert.equal(ann.state.vote.stage, 'reveal');
+
+  // next round: the full clock runs out on a silent Cleo - that still counts
+  await env.advance(3500 + 12_000);
+  assert.equal(ann.state.phase, 'caption');
+  ann.send({ t: 'submit', captions: caption('a') });
+  ben.send({ t: 'submit', captions: caption('b') });
+  await env.advance(30_000);
+  assert.equal(ann.state.phase, 'vote');
+  assert.deepEqual(ann.state.players.map((p) => p.away), [false, false, true]);
+});
