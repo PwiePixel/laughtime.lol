@@ -212,3 +212,38 @@ test('swap: two players who brought the same GIF do not fill a hand with it twic
   assert.equal(host.state.phase, 'scores');
   assert.equal(host.state.results.length, 4);
 });
+
+test('one connection has one vote per meme, whatever it calls itself', async () => {
+  const { players, host, code } = await env.room(3, { game: 'classic', settings: { rounds: 1 } });
+  await env.start(host);
+  for (const p of players) p.send({ t: 'submit', captions: caption(p.name) });
+  await env.advance(1500);
+  assert.equal(host.state.phase, 'vote');
+  const author = players.find((p) => p.state.vote.isMine);
+  const voter = players.find((p) => p !== author);
+  // a spectator who arrives during the vote may rate the meme - once
+  const guest = env.client({ name: 'Guest' }).join(code);
+  guest.send({ t: 'vote', score: 5 });
+  assert.equal(host.state.vote.votes, 1);
+  // the same connection under new names: no further votes
+  for (let i = 0; i < 10; i++) {
+    guest.send({ t: 'hello', code, pid: `second-face-${String(i).padStart(3, '0')}`, secret: 'secret-of-a-second-face-0123456789', name: `Face ${i}`, avatar: 'cat|1' });
+    guest.send({ t: 'vote', score: 5 });
+  }
+  assert.equal(host.state.vote.votes, 1);
+  // changing the own rating still works, and so does everybody else
+  guest.send({ t: 'hello', code, pid: guest.pid, secret: guest.secret, name: guest.name, avatar: 'cat|1' });
+  guest.send({ t: 'vote', score: 2 });
+  voter.send({ t: 'vote', score: 4 });
+  voter.send({ t: 'vote', score: 3 });
+  assert.equal(host.state.vote.votes, 2);
+  assert.equal(guest.state.vote.myScore, 2);
+  await env.advance(12_000);
+  assert.equal(host.state.vote.stage, 'reveal');
+  assert.equal(host.state.vote.points, 5);
+  // the next meme: every connection starts afresh
+  await env.advance(3500);
+  assert.equal(host.state.vote.stage, 'rating');
+  if (!guest.state.vote.isMine) guest.send({ t: 'vote', score: 1 });
+  assert.equal(host.state.vote.votes, 1);
+});

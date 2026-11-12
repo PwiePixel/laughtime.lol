@@ -1121,6 +1121,7 @@ function nextVoteItem(room) {
     endingSoon: false,
     lastCall: false,
     crowd: new Map(), // reactor -> reactions that counted for this meme
+    sockets: new WeakMap(), // connection -> the player it voted as (see the vote handler)
     sameAsPrev: cur.sameAsPrev.has(pid),
   };
   const voters = connectedPlayers(room).filter((p) => p.id !== pid);
@@ -1876,6 +1877,9 @@ function handleMessage(ws, msg) {
       if (room.phase !== 'vote' || !item || item.stage !== 'rating' || item.pid === player.id) return;
       const score = Number(msg.score);
       if (!Number.isInteger(score) || score < 1 || score > 5) return;
+      // one connection, one voter: saying hello under another id does not buy a second vote on this meme
+      if ((item.sockets.get(ws) || player.id) !== player.id) return;
+      item.sockets.set(ws, player.id);
       touch(room, player);
       item.votes.set(player.id, score);
       broadcast(room);
