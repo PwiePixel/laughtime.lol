@@ -955,7 +955,8 @@ function swapHand(room, player, ownerIds, { allowOwn = true } = {}) {
   const hand = [];
   for (const id of ownerIds) {
     const c = cur.contribs.get(id);
-    if (!c) continue;
+    // two players brought the very same GIF: seeing it twice would not be a choice
+    if (!c || hand.some((option) => option.media.id === c.media.id)) continue;
     cur.offers.set(id, (cur.offers.get(id) || 0) + 1);
     hand.push({ media: c.media, from: id });
   }

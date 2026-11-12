@@ -178,3 +178,37 @@ test('swap: a report about a picture reaches whoever brought it, also after they
   assert.equal(ann.state.results.find((r) => r.pid === ann.pid).assist, null);
   assert.deepEqual(ben.errors(), []);
 });
+
+test('swap: two players who brought the same GIF do not fill a hand with it twice', async () => {
+  env.search();
+  const { players, host } = await env.room(4, { game: 'swap', settings: { rounds: 1 } });
+  await env.start(host);
+  // everybody taps the same idea and takes the first hit, only the last player looks further down
+  const brought = [];
+  for (const [i, p] of players.entries()) {
+    await env.advance(700);
+    p.send({ t: 'swap_search', q: 'cats' });
+    await flush();
+    const [res] = p.take('swap_results').slice(-1);
+    const item = res.items[i === 3 ? 5 : 0];
+    p.send({ t: 'swap_pick', id: item.id });
+    brought.push(item.id);
+  }
+  await env.advance(2500);
+  assert.equal(host.state.phase, 'caption');
+  for (const p of players) {
+    const ids = p.state.caption.hand.map((tile) => tile.media.id);
+    assert.equal(new Set(ids).size, ids.length, `${p.name} got ${ids.join(' + ')}`);
+    assert.ok(ids.length >= 1 && ids.length <= 2);
+    assert.equal(p.state.caption.media.id, ids[0]);
+  }
+  // the round plays through as usual
+  for (const p of players) p.send({ t: 'submit', captions: caption(p.name) });
+  await env.advance(1500);
+  while (host.state.phase === 'vote') {
+    await rate(players, 4);
+    await env.advance(3500);
+  }
+  assert.equal(host.state.phase, 'scores');
+  assert.equal(host.state.results.length, 4);
+});
