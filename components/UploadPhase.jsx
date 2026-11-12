@@ -215,7 +215,7 @@ export default function UploadPhase({ game }) {
       <div className="phase-head">
         <div>
           <h1>{t('swap.title')}</h1>
-          <PhaseSub lastCall={state.lastCall} done={Boolean(mine)}>
+          <PhaseSub lastCall={state.lastCall} done={Boolean(mine)} short={t('swap.subShort')}>
             {t('swap.sub')}
           </PhaseSub>
         </div>

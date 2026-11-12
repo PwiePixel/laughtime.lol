@@ -86,7 +86,7 @@ export default function VotePhase({ game }) {
       <div className="phase-head">
         <div>
           <h1>{t('vote.title')}</h1>
-          <PhaseSub lastCall={state.lastCall && !reveal} done={v.isMine || myScore !== null}>
+          <PhaseSub lastCall={state.lastCall && !reveal} done={v.isMine || myScore !== null} short={counter}>
             {counter}
             {reveal ? ` · ${t(last ? 'vote.lastOne' : 'vote.next')}` : ''}
           </PhaseSub>
@@ -98,6 +98,12 @@ export default function VotePhase({ game }) {
       </p>
 
       <div className="vote-stage">
+        {/* on the upper edge of the meme: inside it the chip would cover the caption */}
+        {v.sameAsPrev && (
+          <span className="take-chip" key={v.index}>
+            <Icon name="copy" size={14} /> {t('swap.secondTake')}
+          </span>
+        )}
         <MemeCanvas
           key={`${v.index}-${v.meme.media.id}`}
           media={v.meme.media}
@@ -107,11 +113,6 @@ export default function VotePhase({ game }) {
           downloadable
         >
           <FloatingReactions onReact={onReact} />
-          {v.sameAsPrev && (
-            <span className="take-chip">
-              <Icon name="copy" size={14} /> {t('swap.secondTake')}
-            </span>
-          )}
         </MemeCanvas>
         <div className="vote-meta">
           {/* GIF Hunt: the search term is part of the punchline - its place is kept free until the reveal */}

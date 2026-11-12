@@ -153,7 +153,14 @@ function HuntStart({ hunt, busy, empty, onSearch, onLucky }) {
         <span>GIF</span>
       </div>
       <h2>{t('caption.huntTitle')}</h2>
-      <p className="muted hunt-intro">{t('caption.huntSub', { n: hunt.max })}</p>
+      {/* a search without a hit answers right where the intro was: next to the box, never behind the bar */}
+      {empty && !busy ? (
+        <p className="hunt-empty" role="status">
+          <Icon name="search-x" size={18} /> {t('caption.noResults', { q: empty })}
+        </p>
+      ) : (
+        <p className="muted hunt-intro">{t('caption.huntSub', { n: hunt.max })}</p>
+      )}
       {canSearch && <SearchForm left={hunt.searchesLeft} busy={busy} autoFocus onSearch={onSearch} />}
       {canSearch && hunt.ideas?.length > 0 && (
         <div className="idea-row">
@@ -173,11 +180,6 @@ function HuntStart({ hunt, busy, empty, onSearch, onLucky }) {
             <Icon name="dice" size={18} /> {t('hunt.lucky')}
           </button>
         )
-      )}
-      {empty && !busy && (
-        <p className="hunt-empty" role="status">
-          <Icon name="search-x" size={18} /> {t('caption.noResults', { q: empty })}
-        </p>
       )}
       <Tries hunt={hunt} />
     </div>
@@ -361,13 +363,14 @@ function Editor({ game, done, total }) {
   const twoPlayers = state.players.filter((p) => p.connected).length <= 2;
   const progressText = t('caption.progress', { done, total });
   const sub = hunt ? t('caption.huntSub', { n: hunt.max }) : t('caption.sub');
+  const subShort = t(hunt ? 'caption.huntShort' : 'caption.subShort');
 
   return (
-    <div className={`phase caption-phase has-bar game-${gameId} ${cap.submitted ? 'is-submitted' : ''}`}>
+    <div className={`phase caption-phase has-bar game-${gameId} ${cap.submitted ? 'is-submitted' : ''} ${hand.length > 1 ? 'has-hand' : ''}`}>
       <div className="phase-head">
         <div>
           <h1>{t('caption.title')}</h1>
-          <PhaseSub lastCall={state.lastCall} done={cap.submitted}>
+          <PhaseSub lastCall={state.lastCall} done={cap.submitted} short={subShort}>
             {sub}
           </PhaseSub>
         </div>
@@ -557,10 +560,13 @@ function Editor({ game, done, total }) {
                 )}
               </div>
 
-              <button type="button" className="btn btn-yellow btn-big btn-block desktop-action" onClick={submit} disabled={!canSubmit || sending}>
-                {sending ? <span className="spinner tiny" aria-hidden="true" /> : null} {t('caption.submit')}
-              </button>
-              <p className="muted small center-text desktop-action">{progressText}</p>
+              {/* stays in reach at the bottom of the screen when the panel is taller than the window */}
+              <div className="editor-submit desktop-action">
+                <button type="button" className="btn btn-yellow btn-big btn-block" onClick={submit} disabled={!canSubmit || sending}>
+                  {sending ? <span className="spinner tiny" aria-hidden="true" /> : null} {t('caption.submit')}
+                </button>
+                <p className="muted small center-text">{progressText}</p>
+              </div>
             </>
           )}
           {isHost && (

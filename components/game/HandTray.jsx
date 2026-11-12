@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import Icon from '../Icon';
 import { MediaThumb } from '../PackCard';
 import { useApp } from '../Providers';
@@ -21,7 +22,23 @@ function groupsOf(hand) {
  */
 export default function HandTray({ hand, pickedId, onPick, variant = 'tray', title, disabled = false }) {
   const { t } = useApp();
-  if (!hand?.length) return null;
+  const scroller = useRef(null);
+  const count = hand?.length || 0;
+
+  // a new search appends its tiles at the end of the row: bring the picked one into view
+  useEffect(() => {
+    const box = scroller.current;
+    const tile = box?.querySelector('.hand-tile.on');
+    if (!box || !tile || box.scrollWidth <= box.clientWidth + 1) return;
+    const view = box.getBoundingClientRect();
+    const rect = tile.getBoundingClientRect();
+    if (rect.left >= view.left && rect.right <= view.right) return;
+    const group = (tile.closest('.hand-group') || tile).getBoundingClientRect();
+    const calm = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    box.scrollTo({ left: box.scrollLeft + group.left - view.left - 4, behavior: calm ? 'auto' : 'smooth' });
+  }, [count, pickedId]);
+
+  if (!count) return null;
 
   const tile = (item, n) => {
     const on = item.id === pickedId;
@@ -56,7 +73,7 @@ export default function HandTray({ hand, pickedId, onPick, variant = 'tray', tit
   return (
     <div className="hand hand-tray" role="group" aria-label={title}>
       {title && <p className="hand-title">{title}</p>}
-      <div className="hand-scroll">
+      <div className="hand-scroll" ref={scroller}>
         {groupsOf(hand).map((g, gi) => (
           <div key={`${gi}-${g.tiles[0].id}`} className="hand-group">
             <span className="hand-label" title={g.q || t('hunt.luckyTile')}>
