@@ -544,17 +544,17 @@ function Editor({ game, done, total }) {
                     </div>
                   </div>
                 )}
+              </div>
 
-                <div className="editor-actions">
-                  <button type="button" className="btn btn-white" onClick={addText} disabled={captions.length >= LIMITS.captions}>
-                    <Icon name="plus" /> {t('caption.add')}
+              <div className="editor-actions">
+                <button type="button" className="btn btn-white" onClick={addText} disabled={captions.length >= LIMITS.captions}>
+                  <Icon name="plus" /> {t('caption.add')}
+                </button>
+                {gameId === 'classic' && (
+                  <button type="button" className="btn btn-pink" onClick={reroll} disabled={cap.rerollsLeft <= 0}>
+                    <Icon name="dice" /> {t('caption.reroll', { n: cap.rerollsLeft })}
                   </button>
-                  {gameId === 'classic' && (
-                    <button type="button" className="btn btn-pink" onClick={reroll} disabled={cap.rerollsLeft <= 0}>
-                      <Icon name="dice" /> {t('caption.reroll', { n: cap.rerollsLeft })}
-                    </button>
-                  )}
-                </div>
+                )}
               </div>
 
               <button type="button" className="btn btn-yellow btn-big btn-block desktop-action" onClick={submit} disabled={!canSubmit || sending}>
