@@ -1118,11 +1118,12 @@ function revealVoteItem(room) {
   item.dist = distOf(scores);
   item.stage = 'reveal';
   if (paced(room)) {
-    // who keeps missing votes is away and no longer waited for
+    // Missed votes are only counted here. The player is marked as away with the scores:
+    // a mark that appears in the middle of the vote would show which meme they did not
+    // have to vote on - their own.
     for (const p of presentPlayers(room)) {
       if (p.id === item.pid || item.votes.has(p.id)) continue;
       p.missedVotes = (p.missedVotes || 0) + 1;
-      if (p.missedVotes >= AWAY_MISSED_VOTES) p.away = true;
     }
   }
   const author = room.players.get(item.pid);
@@ -1185,6 +1186,10 @@ function endVote(room) {
     }
   }
   if (isSwap(room)) applyAssists(room);
+  if (paced(room)) {
+    // who kept missing votes is away from now on and no longer waited for
+    for (const p of room.players.values()) if (p.missedVotes >= AWAY_MISSED_VOTES) p.away = true;
+  }
   const top = cur.results[0];
   // round wins in a row (cosmetic)
   const winner = top && top.points > 0 ? top.pid : null;

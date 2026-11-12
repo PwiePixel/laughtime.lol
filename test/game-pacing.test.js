@@ -164,51 +164,49 @@ test('pacing: a silent round makes a player away - the others are no longer held
   assert.equal(row(host, dora).away, false);
 });
 
-test('pacing: two missed votes in a row make a player away, any input brings them back', async () => {
-  const { players, host } = await env.room(5, { game: 'hunt', settings: { rounds: 1 } });
+test('pacing: two missed votes in a row make a player away with the scores, any input brings them back', async () => {
+  const { players, host } = await env.room(5, { game: 'hunt', settings: { rounds: 2 } });
   const [ann, ben, cleo, dora, eve] = players;
   await env.start(host);
   for (const p of players) await ready(p);
   await env.advance(1500);
   assert.equal(host.state.phase, 'vote');
-  const voters = (author) => players.filter((p) => p !== author && p !== eve);
-  let missed = 0;
-  let item = 0;
   // Eve wrote a meme but does not vote
-  while (missed < 2) {
+  for (let item = 0; item < 5; item++) {
     const author = players.find((p) => p.state.vote.isMine);
-    const others = voters(author);
-    for (const p of others) p.send({ t: 'vote', score: 3 });
+    for (const p of players) if (p !== author && p !== eve) p.send({ t: 'vote', score: 3 });
     if (author === eve) {
       // everybody voted on her meme: the usual early reveal
       await env.advance(900);
-      assert.equal(host.state.vote.stage, 'reveal');
-      await env.advance(3500);
     } else {
       // three of four voted: last call of 4 s instead of the remaining 12
       assert.equal(host.state.lastCall, true);
       assert.equal(left(host), 4000);
-      assert.equal(row(host, eve).away, false);
       await env.advance(4000);
-      missed += 1;
-      assert.equal(row(host, eve).away, missed >= 2);
-      await env.advance(3500);
     }
-    item += 1;
+    assert.equal(host.state.vote.stage, 'reveal');
+    // No mark while the memes are anonymous: the moment it appeared would show which
+    // meme she did not have to vote on.
+    for (const p of players) assert.ok(p.state.players.every((x) => x.away === false));
+    await env.advance(3500);
   }
-  // from now on nobody waits for her
-  assert.ok(item < 5);
-  const author = players.find((p) => p.state.vote.isMine);
-  const others = voters(author);
-  for (const p of others) p.send({ t: 'vote', score: 3 });
-  await env.advance(899);
-  assert.equal(host.state.vote.stage, 'rating');
-  await env.advance(1);
-  assert.equal(host.state.vote.stage, 'reveal');
+  // the authors are known now - and so is who was not there
+  assert.equal(host.state.phase, 'scores');
+  for (const p of players) assert.deepEqual(p.state.players.map((x) => x.away), [false, false, false, false, true]);
+  await env.advance(12_000);
+  // round 2: nobody waits for her
+  assert.equal(host.state.round, 2);
+  for (const p of [ann, ben, cleo]) await ready(p);
+  assert.equal(host.state.lastCall, true, 'three of the four who are here: last call for Dora, Eve does not count');
+  assert.equal(left(host), 45_000);
+  await ready(dora);
+  assert.equal(left(host), 1500);
   // a reaction is input too
   eve.send({ t: 'react', emoji: 'laugh' });
-  assert.equal(row(host, eve).away, false);
+  for (const p of players) assert.equal(row(p, eve).away, false);
   assert.equal(ann.take('react').length, 1);
+  // she is back: the early end stays (it only moves for somebody who joins or takes a meme back)
+  assert.equal(left(host), 1500);
 });
 
 test('pacing: the vote last call needs at least three voters and is used once per meme', async () => {
