@@ -5,7 +5,7 @@ import { ROOM_CODE_RE } from '../lib/shared.js';
 import { isAdmin, purgeExpiredSessions, userFromRequest } from './accounts.js';
 import { activityFramePolicy, isActivityRequest } from './activity.js';
 import { handleApi } from './api.js';
-import { requestChannel } from './channel.js';
+import { logBetaSettings, markBetaHost, requestChannel, tagRequest } from './channel.js';
 import { ROOT, getConfig } from './config.js';
 import { openDatabase } from './db.js';
 import { attachGame, createRoom, handleRoomUpload, publicStats, roomInfo, stats } from './game.js';
@@ -40,6 +40,7 @@ export async function startServer({ dev = false, dir = ROOT } = {}) {
   const nextUpgrade = dev ? app.getUpgradeHandler() : null;
 
   startMediaPool();
+  logBetaSettings();
   sweepCache().catch(() => {});
   setInterval(() => sweepCache().catch(() => {}), 15 * 60 * 1000).unref();
   purgeExpiredSessions();
@@ -63,6 +64,8 @@ export async function startServer({ dev = false, dir = ROOT } = {}) {
     try {
       const url = new URL(req.url, 'http://localhost');
       const p = url.pathname;
+      // the beta host is the same app on a second address: keep it out of search engines
+      markBetaHost(req, res);
 
       if (p === '/api/media' && (req.method === 'GET' || req.method === 'HEAD')) {
         return await handleMediaRequest(req, res, url.searchParams);
@@ -173,6 +176,8 @@ export async function startServer({ dev = false, dir = ROOT } = {}) {
       if (framePolicy) res.setHeader('Content-Security-Policy', framePolicy);
       // installable web app: browsers must always get the newest worker and manifest
       if (p === '/sw.js' || p === '/manifest.json') res.setHeader('Cache-Control', 'no-cache');
+      // release channel + beta gate for the layout (decided here, where the session is known)
+      tagRequest(req);
       return await handle(req, res);
     } catch (err) {
       console.error('[http]', err);
