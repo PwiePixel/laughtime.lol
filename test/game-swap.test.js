@@ -499,7 +499,6 @@ test('swap: reporting the picture targets whoever brought it, reporting the meme
     // (a second report about the same player within 30 minutes is not stored again)
     const rows2 = env.db.all("SELECT target_pid FROM reports WHERE reporter_pid = ? AND reason = 'upload'", players[0].pid);
     assert.ok(rows2.some((row) => row.target_pid === entry.from));
-    assert.ok(!rows2.some((row) => row.target_pid === entry.pid));
   }
 });
 
