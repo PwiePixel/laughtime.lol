@@ -2,6 +2,8 @@
 const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  // this folder is the project root, even when it sits inside another checkout
+  turbopack: { root: import.meta.dirname },
   // the custom server (server/) is plain Node and not part of the Next bundle
   outputFileTracingExcludes: { '*': ['./data/**'] },
   async headers() {

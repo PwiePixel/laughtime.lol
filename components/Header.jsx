@@ -7,6 +7,7 @@ import { api } from '@/lib/api';
 import Avatar from './Avatar';
 import Icon from './Icon';
 import { useApp } from './Providers';
+import BetaBadge from './v2/BetaBadge';
 
 function AccountMenu({ inActivity = false }) {
   const { t, account, accountLoading, logout } = useApp();
@@ -118,6 +119,7 @@ export default function Header({ activityView = null }) {
           laughtime<span>.lol</span>
         </span>
       </Link>
+      <BetaBadge />
       <nav className="main-nav" aria-label="Main">
         {links.map((l) => {
           const active = isActive(l);

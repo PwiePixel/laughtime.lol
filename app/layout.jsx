@@ -3,11 +3,18 @@ import Footer from '@/components/Footer';
 import Header from '@/components/Header';
 import Providers from '@/components/Providers';
 import SanctionGate from '@/components/SanctionGate';
+import PwaBoot from '@/components/v2/PwaBoot';
 import { LANG_COOKIE, normalizeLang, translate } from '@/lib/i18n';
 import { memeFont, uiFont } from './fonts';
 import './globals.css';
 import './community.css';
 import './modes.css';
+import './v2.css';
+import './modes-v2.css';
+import './news.css';
+import './pwa.css';
+import './beta.css';
+import './activity.css';
 
 async function getLang() {
   const store = await cookies();
@@ -60,6 +67,7 @@ export default async function RootLayout({ children }) {
             <SanctionGate>{children}</SanctionGate>
           </main>
           <Footer />
+          <PwaBoot />
         </Providers>
       </body>
     </html>

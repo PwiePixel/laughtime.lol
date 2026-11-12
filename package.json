@@ -1,6 +1,6 @@
 {
   "name": "laughtime",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
   "description": "LaughTime.lol – multiplayer meme party game with images and short video clips",
   "type": "module",
@@ -11,7 +11,8 @@
   "scripts": {
     "start": "node index.js",
     "dev": "node index.js --dev",
-    "build": "next build"
+    "build": "next build",
+    "test": "node --test \"test/**/*.test.js\""
   },
   "dependencies": {
     "@discord/embedded-app-sdk": "^2.5.0",

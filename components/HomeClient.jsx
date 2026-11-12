@@ -14,6 +14,7 @@ import LolLogo from './LolLogo';
 import MemeCanvas from './MemeCanvas';
 import MemeCard from './MemeCard';
 import { useApp } from './Providers';
+import NewsTeaser from './v2/NewsTeaser';
 
 function Sparkle({ className, color = '#fff' }) {
   return (
@@ -273,6 +274,8 @@ export default function HomeClient() {
       </section>
 
       {picker && <GamePicker purpose={picker} busy={busy} onPick={pickGame} onClose={() => !busy && setPicker(null)} />}
+
+      <NewsTeaser />
 
       {community && (community.topMemes?.length > 0 || community.topPlayers?.length > 0) && (
         <section className="community">
