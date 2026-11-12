@@ -11,6 +11,7 @@
  *   node index.js           -> production
  *   node index.js --dev     -> development with hot reload
  *   node index.js --rebuild -> force a fresh build
+ *   node index.js --build-only -> install + build like a normal start, then exit (used by install.sh)
  */
 import { spawnSync } from 'node:child_process';
 import crypto from 'node:crypto';
@@ -20,7 +21,9 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const args = new Set(process.argv.slice(2));
-const DEV = args.has('--dev') || process.env.LT_DEV === '1';
+// --build-only always prepares the production build, whatever LT_DEV says
+const BUILD_ONLY = args.has('--build-only');
+const DEV = !BUILD_ONLY && (args.has('--dev') || process.env.LT_DEV === '1');
 const FORCE_BUILD = args.has('--rebuild') || process.env.FORCE_BUILD === '1';
 
 const log = (...m) => console.log('\x1b[35m[laughtime]\x1b[0m', ...m);
@@ -154,6 +157,12 @@ if (!DEV) {
   } else {
     log('Build is up to date.');
   }
+}
+
+// 5b) --build-only: the installer builds exactly like a normal start, the service then starts fast
+if (BUILD_ONLY) {
+  log('Build is ready (--build-only) – not starting the server.');
+  process.exit(0);
 }
 
 // 6) start ------------------------------------------------------------------
