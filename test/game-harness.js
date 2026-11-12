@@ -39,6 +39,7 @@ export class Client {
     ws.close = () => {};
     if (this.account) ws.account = this.account;
     this.ws = ws;
+    this.env.clients.add(this);
     this.env.wss.clients.add(ws);
     this.env.wss.emit('connection', ws);
     return this;
@@ -120,6 +121,8 @@ export function setupGame(env = {}) {
       db,
       wss,
       dir,
+      clients: new Set(),
+      uploads: [],
       now: () => Date.now(),
       /** let the clock run and give promises a chance to settle */
       async advance(ms) {
@@ -164,8 +167,16 @@ export function setupGame(env = {}) {
       },
       /** uploads a picture in the bring phase of a swap round, like the HTTP route does */
       async upload(client, code) {
-        const { sniffImage } = await import('../server/uploads.js');
-        return game.handleRoomUpload(code, client.pid, client.secret, { buf: PNG, info: sniffImage(PNG), name: `secret name of ${client.name}` });
+        const { sniffImage, UPLOAD_DIR } = await import('../server/uploads.js');
+        const res = await game.handleRoomUpload(code, client.pid, client.secret, { buf: PNG, info: sniffImage(PNG), name: `secret name of ${client.name}` });
+        ctx.uploads.push(path.join(UPLOAD_DIR, client.state.upload.mine.media.src.replace('/api/uploads/', '')));
+        return res;
+      },
+      /** everybody leaves; empty rooms are closed and their uploaded files deleted */
+      async shutdown() {
+        for (const c of ctx.clients) if (c.ws.readyState === 1) c.drop();
+        mock.timers.tick(11 * 60 * 1000);
+        await ctx.until(() => ctx.uploads.every((file) => !fs.existsSync(file)), 'uploaded files to be deleted');
       },
       /** waits for real I/O (files, database) */
       async until(check, what = 'condition') {
