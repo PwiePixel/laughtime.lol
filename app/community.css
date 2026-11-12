@@ -38,8 +38,6 @@
   background: var(--yellow);
   color: var(--ink);
   box-shadow: var(--glow-yellow);
-  /* the pill slides to the new entry while the page changes */
-  view-transition-name: nav-active;
 }
 
 .header-right {

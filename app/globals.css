@@ -53,7 +53,10 @@ body {
    (A fixed background on <body> would be repainted on every scroll frame.) */
 .bg-dots {
   position: fixed;
-  inset: 0;
+  inset: 0 0 auto;
+  /* the tallest viewport: no gap while a phone hides its address bar */
+  height: 100vh;
+  height: 100lvh;
   z-index: -1;
   overflow: hidden;
   pointer-events: none;
@@ -510,7 +513,9 @@ a.btn {
 }
 
 .input::placeholder {
-  color: #9b8db3;
+  /* 4.5:1 on white */
+  color: #7a6a96;
+  opacity: 1;
 }
 
 textarea.input {
@@ -1098,6 +1103,8 @@ textarea.input {
   color: var(--ink);
   font-weight: 700;
   text-align: center;
+  box-shadow: var(--shadow-sm);
+  animation: v2-rise var(--dur-slow, 420ms) var(--ease-spring, ease) backwards;
 }
 
 .join-card h1 {
@@ -1901,7 +1908,7 @@ textarea.input {
 }
 
 .lb-delta {
-  color: #178a3e;
+  color: var(--green-ink, #14753a);
   font-weight: 700;
   font-size: 0.9rem;
 }
