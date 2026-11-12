@@ -1604,6 +1604,11 @@ button.strip-player {
     display: none !important;
   }
 
+  /* lobby: the host starts from the bar, the start card would be an empty box */
+  .lobby.has-bar .start-bar {
+    display: none;
+  }
+
   /* caption */
   .caption-phase {
     --stage-h: min(42vh, 360px);
@@ -1688,7 +1693,21 @@ button.strip-player {
   }
 
   .caption-phase.game-hunt {
-    --stage-h: min(34vh, 280px);
+    --stage-h: min(27vh, 250px);
+  }
+
+  .hunt-more {
+    gap: 8px;
+    padding-bottom: 10px;
+  }
+
+  .hand-tray .hand-tile {
+    width: 66px;
+    height: 66px;
+  }
+
+  .hand-scroll {
+    padding: 4px 4px 6px;
   }
 
   .hand-duo {
@@ -1898,6 +1917,18 @@ button.strip-player {
 
   .award-title {
     font-size: 0.95rem;
+  }
+}
+
+/* short phones: the tray explains itself, its headline makes room for the text box */
+@media (max-width: 720px) and (max-height: 780px) {
+  .hand-tray .hand-title {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
   }
 }
 
