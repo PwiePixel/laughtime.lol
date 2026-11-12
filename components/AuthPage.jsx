@@ -23,6 +23,8 @@ export default function AuthPage() {
   const [error, setError] = useState(params.get('error') || '');
   const [busy, setBusy] = useState(false);
   const [nameFree, setNameFree] = useState(null);
+  const [showPass, setShowPass] = useState(false);
+  const [capsLock, setCapsLock] = useState(false);
 
   useEffect(() => {
     if (profile && !avatar) setAvatar(profile.avatar);
@@ -69,6 +71,12 @@ export default function AuthPage() {
   }
 
   const errText = error ? (t(`auth.err.${error}`) === `auth.err.${error}` ? t('err.network') : t(`auth.err.${error}`)) : '';
+  const registering = mode === 'register';
+  // only judge the repeat field once something was typed into it
+  const repeatState = registering && password2 ? (password === password2 ? 'good' : 'bad') : '';
+  // a hidden password is where caps lock hurts
+  const watchCaps = (e) => setCapsLock(Boolean(e.getModifierState?.('CapsLock')));
+  const passType = showPass ? 'text' : 'password';
 
   return (
     <div className="page-narrow auth-page">
@@ -116,27 +124,53 @@ export default function AuthPage() {
             autoComplete="username"
             maxLength={20}
             required
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            aria-invalid={registering && nameFree === false ? true : undefined}
+            aria-describedby={registering ? 'auth-user-hint' : undefined}
             onChange={(e) => setUsername(e.target.value.replace(/\s/g, ''))}
           />
-          {mode === 'register' && (
-            <p className={`field-hint ${nameFree === false ? 'bad' : nameFree ? 'good' : ''}`}>
+          {registering && (
+            <p id="auth-user-hint" className={`field-hint ${nameFree === false ? 'bad' : nameFree ? 'good' : ''}`} aria-live="polite">
               {nameFree === false ? t('auth.nameTaken') : nameFree ? t('auth.nameFree') : t('auth.usernameRules')}
             </p>
           )}
           <label className="label" htmlFor="auth-pass">
             {t('auth.password')}
           </label>
-          <input
-            id="auth-pass"
-            className="input"
-            type="password"
-            value={password}
-            autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-            minLength={mode === 'register' ? 8 : undefined}
-            required
-            onChange={(e) => setPassword(e.target.value)}
-          />
-          {mode === 'register' && (
+          <span className="input-wrap">
+            <input
+              id="auth-pass"
+              className="input"
+              type={passType}
+              value={password}
+              autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+              minLength={registering ? 8 : undefined}
+              required
+              aria-describedby={capsLock ? 'auth-caps' : undefined}
+              onChange={(e) => setPassword(e.target.value)}
+              onKeyDown={watchCaps}
+              onKeyUp={watchCaps}
+              onBlur={() => setCapsLock(false)}
+            />
+            <button
+              type="button"
+              className="input-action"
+              aria-pressed={showPass}
+              aria-label={t(showPass ? 'ui.hidePassword' : 'ui.showPassword')}
+              data-tip={t(showPass ? 'ui.hidePassword' : 'ui.showPassword')}
+              onClick={() => setShowPass((v) => !v)}
+            >
+              <Icon name={showPass ? 'eye-off' : 'eye'} size={20} />
+            </button>
+          </span>
+          {capsLock && !showPass && (
+            <p id="auth-caps" className="field-hint warn" role="status">
+              {t('ui.capsLock')}
+            </p>
+          )}
+          {registering && (
             <>
               <label className="label" htmlFor="auth-pass2">
                 {t('auth.password2')}
@@ -144,13 +178,24 @@ export default function AuthPage() {
               <input
                 id="auth-pass2"
                 className="input"
-                type="password"
+                type={passType}
                 value={password2}
                 autoComplete="new-password"
                 required
+                aria-invalid={repeatState === 'bad' ? true : undefined}
+                aria-describedby="auth-pass2-hint"
                 onChange={(e) => setPassword2(e.target.value)}
+                onKeyDown={watchCaps}
+                onKeyUp={watchCaps}
+                onBlur={() => setCapsLock(false)}
               />
-              <p className="field-hint">{t('auth.passwordRules')}</p>
+              <p id="auth-pass2-hint" className={`field-hint ${repeatState}`} aria-live="polite">
+                {repeatState === 'good'
+                  ? t('ui.passwordsMatch')
+                  : repeatState === 'bad'
+                    ? t('auth.err.password_mismatch')
+                    : t('auth.passwordRules')}
+              </p>
               <span className="label">{t('home.avatarLabel')}</span>
               {avatar && <AvatarPicker value={avatar} onChange={setAvatar} />}
             </>
@@ -160,7 +205,8 @@ export default function AuthPage() {
               {errText}
             </p>
           )}
-          <button type="submit" className="btn btn-yellow btn-big btn-block auth-submit" disabled={busy}>
+          <button type="submit" className="btn btn-yellow btn-big btn-block auth-submit" disabled={busy} aria-busy={busy}>
+            {busy && <span className="spinner tiny" aria-hidden="true" />}
             {busy ? t('common.loading') : t(mode === 'login' ? 'auth.loginBtn' : 'auth.registerBtn')}
           </button>
         </form>

@@ -34,6 +34,7 @@
 
 html {
   -webkit-text-size-adjust: 100%;
+  background: var(--bg);
 }
 
 body {
@@ -45,20 +46,23 @@ body {
   font-size: 17px;
   line-height: 1.5;
   color: var(--white);
-  background:
-    radial-gradient(1100px 700px at 10% -10%, #5b1fa8 0%, transparent 60%),
-    radial-gradient(900px 700px at 110% 110%, #8a1e6e 0%, transparent 55%),
-    var(--bg);
-  background-attachment: fixed;
+  /* the page colour sits on <html>; a background here would cover .bg-dots */
 }
 
+/* The whole backdrop is one fixed layer: dots on top of the two colour washes.
+   (A fixed background on <body> would be repainted on every scroll frame.) */
 .bg-dots {
   position: fixed;
   inset: 0;
   z-index: -1;
+  overflow: hidden;
   pointer-events: none;
-  background-image: radial-gradient(rgba(255, 255, 255, 0.09) 1.6px, transparent 1.6px);
-  background-size: 30px 30px;
+  contain: strict;
+  background:
+    radial-gradient(rgba(255, 255, 255, 0.09) 1.6px, transparent 1.6px) 0 0 / 30px 30px,
+    radial-gradient(1100px 700px at 10% -10%, #5b1fa8 0%, transparent 60%),
+    radial-gradient(900px 700px at 110% 110%, #8a1e6e 0%, transparent 55%),
+    var(--bg);
 }
 
 img,
@@ -100,7 +104,7 @@ select {
 }
 
 :focus-visible {
-  outline: 3px solid var(--cyan);
+  outline: 3px solid var(--ring, var(--cyan));
   outline-offset: 3px;
 }
 
@@ -236,12 +240,18 @@ select {
   color: var(--text);
   border: var(--border);
   border-radius: var(--radius);
-  box-shadow: var(--shadow);
+  /* hard shadow for the look, a soft one below it for depth */
+  box-shadow: var(--shadow), var(--shadow-ambient, 0 0 0 0 transparent);
   padding: 22px;
 }
 
 .card a {
   color: #8a1e6e;
+}
+
+/* cyan would vanish on cream – inside cards the focus ring is deep pink */
+.card {
+  --ring: var(--ring-on-card, #b0126a);
 }
 
 .prose h2 {
@@ -349,6 +359,9 @@ select {
    ------------------------------------------------------------------ */
 .btn {
   --btn-bg: var(--white);
+  /* height of the hard shadow = how far the button travels when pressed */
+  --btn-depth: 5px;
+  --btn-glow: 0 0 0 0 transparent;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -362,26 +375,43 @@ select {
   font-weight: 700;
   text-decoration: none;
   cursor: pointer;
-  box-shadow: 0 5px 0 var(--ink);
-  transition: transform 0.08s ease, box-shadow 0.08s ease, filter 0.15s;
+  box-shadow: 0 var(--btn-depth) 0 var(--ink), var(--btn-glow);
+  /* button and shadow move on the same curve, so the shadow's lower edge
+     stays planted while the face travels */
+  transition:
+    transform var(--dur, 220ms) var(--ease-spring, ease),
+    box-shadow var(--dur, 220ms) var(--ease-spring, ease),
+    filter 150ms;
   user-select: none;
+  -webkit-user-select: none;
   -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 
-.btn:hover:not(:disabled) {
-  filter: brightness(1.05);
-  transform: translateY(-1px);
-  box-shadow: 0 6px 0 var(--ink);
+@media (hover: hover) {
+  .btn:hover:not(:disabled) {
+    filter: brightness(1.05);
+    transform: translateY(-1px);
+    box-shadow: 0 calc(var(--btn-depth) + 1px) 0 var(--ink), var(--btn-glow);
+  }
 }
 
 .btn:active:not(:disabled) {
-  transform: translateY(4px);
-  box-shadow: 0 1px 0 var(--ink);
+  transform: translateY(calc(var(--btn-depth) - 1px));
+  box-shadow: 0 1px 0 var(--ink), var(--btn-glow);
+  /* down is immediate, the spring is for the way back up */
+  transition-duration: 60ms;
+  transition-timing-function: ease-out;
 }
 
 .btn:disabled {
   opacity: 0.55;
   cursor: not-allowed;
+  filter: saturate(0.7);
+}
+
+.btn[aria-busy='true'] {
+  cursor: progress;
 }
 
 .card a.btn,
@@ -391,14 +421,28 @@ a.btn {
 
 .btn-yellow {
   --btn-bg: var(--yellow);
+  --btn-glow-color: rgba(255, 210, 63, 0.55);
 }
 
 .btn-pink {
   --btn-bg: var(--pink);
+  --btn-glow-color: rgba(255, 79, 163, 0.55);
 }
 
 .btn-cyan {
   --btn-bg: var(--cyan);
+  --btn-glow-color: rgba(53, 224, 255, 0.5);
+}
+
+/* primary actions glow in their own colour (a soft halo under the hard shadow) */
+.btn-big:is(.btn-yellow, .btn-pink, .btn-cyan) {
+  --btn-glow: 0 14px 30px -10px var(--btn-glow-color);
+}
+
+@media (hover: hover) {
+  .btn:is(.btn-yellow, .btn-pink, .btn-cyan):hover:not(:disabled) {
+    --btn-glow: 0 14px 30px -10px var(--btn-glow-color);
+  }
 }
 
 .btn-white {
@@ -407,6 +451,7 @@ a.btn {
 
 .btn-ghost {
   --btn-bg: transparent;
+  --btn-depth: 0px;
   box-shadow: none;
   border-color: transparent;
   color: var(--muted);
@@ -414,7 +459,14 @@ a.btn {
 
 .btn-ghost:hover:not(:disabled) {
   box-shadow: none;
+  transform: none;
   text-decoration: underline;
+}
+
+/* no shadow to sink into: a ghost button just gives a little */
+.btn-ghost:active:not(:disabled) {
+  box-shadow: none;
+  transform: scale(0.96);
 }
 
 .btn-big {
@@ -424,10 +476,10 @@ a.btn {
 }
 
 .btn-small {
+  --btn-depth: 3px;
   min-height: 36px;
   padding: 4px 12px;
   font-size: 0.9rem;
-  box-shadow: 0 3px 0 var(--ink);
   border-radius: 10px;
 }
 
@@ -511,11 +563,17 @@ textarea.input {
   color: var(--ink);
   font-weight: 600;
   cursor: pointer;
+  transition: scale var(--dur-fast, 120ms) var(--ease-spring, ease);
+  -webkit-tap-highlight-color: transparent;
 }
 
 .chip.on {
   background: var(--yellow);
   box-shadow: 0 3px 0 var(--ink);
+}
+
+.chip:active:not(:disabled) {
+  scale: 0.94;
 }
 
 .chip:disabled {
@@ -627,13 +685,21 @@ textarea.input {
   cursor: pointer;
 }
 
-.icon-grid button:hover {
-  background: rgba(23, 10, 46, 0.07);
+@media (hover: hover) {
+  .icon-grid button:hover {
+    background: rgba(23, 10, 46, 0.07);
+  }
 }
 
 .icon-grid button.on {
   border-color: var(--ink);
   background: var(--yellow);
+  animation: v2-pop var(--dur, 220ms) var(--ease-spring, ease);
+}
+
+/* restarted by its key whenever the look changes (see AvatarPicker) */
+.avatar-preview {
+  animation: v2-pop var(--dur-slow, 420ms) var(--ease-spring, ease);
 }
 
 .color-row {
@@ -656,6 +722,13 @@ textarea.input {
   border: 3px solid var(--ink);
   cursor: pointer;
   padding: 0;
+  transition: scale var(--dur-fast, 120ms) var(--ease-spring, ease);
+}
+
+@media (hover: hover) {
+  .swatch:hover {
+    scale: 1.12;
+  }
 }
 
 .swatch.small {
@@ -666,6 +739,11 @@ textarea.input {
 .swatch.on {
   outline: 3px solid var(--pink);
   outline-offset: 2px;
+  scale: 1.08;
+}
+
+.swatch.on:focus-visible {
+  outline-color: var(--ring, var(--cyan));
 }
 
 /* ------------------------------------------------------------------
@@ -691,7 +769,9 @@ textarea.input {
 
 .hero-title .hl {
   color: var(--yellow);
-  text-shadow: 0 4px 0 var(--ink);
+  text-shadow:
+    0 4px 0 var(--ink),
+    0 0 38px rgba(255, 210, 63, 0.4);
 }
 
 .hero-sub {
@@ -836,14 +916,22 @@ textarea.input {
 .meme-loading {
   position: absolute;
   inset: 0;
-  background: linear-gradient(100deg, #1a0d36 20%, #2e1a5c 40%, #1a0d36 60%);
-  background-size: 200% 100%;
-  animation: shimmer 1.2s linear infinite;
+  overflow: hidden;
+  background: #1a0d36;
+}
+
+.meme-loading::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 25%, #34206a 50%, transparent 75%);
+  transform: translateX(-100%);
+  animation: shimmer 1.3s ease-in-out infinite;
 }
 
 @keyframes shimmer {
   to {
-    background-position: -200% 0;
+    transform: translateX(100%);
   }
 }
 
@@ -864,12 +952,14 @@ textarea.input {
   box-shadow: 0 3px 0 var(--ink);
   cursor: pointer;
   opacity: 0.9;
-  transition: transform 0.1s ease, opacity 0.15s;
+  transition: transform var(--dur-fast, 120ms) var(--ease-spring, ease), opacity 0.15s;
 }
 
-.meme-download:hover {
-  opacity: 1;
-  transform: translateY(-1px);
+@media (hover: hover) {
+  .meme-download:hover {
+    opacity: 1;
+    transform: translateY(-1px);
+  }
 }
 
 .meme-download:active {
@@ -983,7 +1073,7 @@ textarea.input {
 }
 
 .pop-in {
-  animation: pop 0.35s cubic-bezier(0.2, 1.4, 0.4, 1);
+  animation: pop 0.35s var(--ease-spring, cubic-bezier(0.2, 1.4, 0.4, 1));
 }
 
 @keyframes pop {
@@ -1022,8 +1112,9 @@ textarea.input {
   position: fixed;
   left: 50%;
   bottom: calc(24px + env(safe-area-inset-bottom, 0px));
-  transform: translateX(-50%);
+  translate: -50% 0;
   z-index: 60;
+  width: max-content;
   max-width: calc(100% - 32px);
   padding: 10px 18px;
   border: var(--border);
@@ -1031,8 +1122,19 @@ textarea.input {
   background: var(--yellow);
   color: var(--ink);
   font-weight: 700;
-  box-shadow: var(--shadow);
-  animation: pop 0.3s ease;
+  text-align: center;
+  text-wrap: balance;
+  box-shadow:
+    var(--shadow),
+    0 18px 40px -12px rgba(255, 210, 63, 0.45);
+  animation: toast-in 0.4s var(--ease-spring, ease) both;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.92);
+  }
 }
 
 .player-strip {
@@ -1344,6 +1446,9 @@ textarea.input {
   width: min(520px, 100%);
   max-height: 90dvh;
   overflow: auto;
+  box-shadow:
+    var(--shadow),
+    0 40px 80px -30px rgba(0, 0, 0, 0.9);
 }
 
 /* Caption */
@@ -1549,16 +1654,24 @@ textarea.input {
   color: var(--ink);
   cursor: pointer;
   box-shadow: 0 5px 0 var(--ink);
-  transition: transform 0.08s ease, box-shadow 0.08s ease, background 0.15s;
+  transition:
+    transform var(--dur, 220ms) var(--ease-spring, ease),
+    box-shadow var(--dur, 220ms) var(--ease-spring, ease);
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 
-.rating:hover {
-  transform: translateY(-2px);
+@media (hover: hover) {
+  .rating:hover {
+    transform: translateY(-2px);
+  }
 }
 
 .rating:active {
   transform: translateY(4px);
   box-shadow: 0 1px 0 var(--ink);
+  transition-duration: 60ms;
+  transition-timing-function: ease-out;
 }
 
 .rating.on {
@@ -1628,7 +1741,9 @@ textarea.input {
   background: rgba(255, 255, 255, 0.08);
   color: var(--rc, #fff);
   cursor: pointer;
-  transition: transform 0.1s;
+  transition: transform var(--dur-fast, 120ms) var(--ease-spring, ease);
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 
 .reaction-bar button:active {
@@ -1691,6 +1806,7 @@ textarea.input {
 
 .result-card.is-top {
   background: #fff1b8;
+  box-shadow: var(--shadow), var(--glow-yellow);
 }
 
 .ribbon {
@@ -1862,6 +1978,7 @@ textarea.input {
 .place-1 .podium-block {
   height: 150px;
   background: var(--yellow);
+  box-shadow: var(--shadow-sm), var(--glow-yellow);
 }
 
 .place-2 .podium-block {
@@ -2084,6 +2201,11 @@ textarea.input {
   .confetti {
     display: none;
   }
+
+  /* endless loaders would freeze half-way: show them resting instead */
+  .meme-loading::after {
+    display: none;
+  }
 }
 
 /* --- author reveal at the end of a round ------------------------------- */
@@ -2110,4 +2232,20 @@ textarea.input {
 
 @media (prefers-reduced-motion: reduce) {
   .author-reveal { animation: none; }
+}
+
+/* --- numbers that change in place keep their width ------------------------ */
+.strip-score,
+.result-points,
+.reveal-points,
+.rank,
+.lb-score,
+.lb-delta,
+.podium-score,
+.podium-block,
+.room-code,
+.room-code-small,
+.code-input,
+.badge {
+  font-variant-numeric: tabular-nums;
 }

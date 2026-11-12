@@ -114,8 +114,10 @@ export default function Header({ activityView = null }) {
   // the news area is part of the website only (the activity maps its own views)
   if (!inActivity) links.push({ href: '/news', label: t('nav.news'), icon: 'sparkles', view: 'news', dot: true });
   const isActive = (l) => (inActivity ? activityView === l.view : l.href === '/' ? pathname === '/' : pathname.startsWith(l.href));
+  // browse pages keep the bar in view; game and tool screens have sticky panels of their own
+  const sticky = !inActivity && !/^\/(room|play|studio|admin)(\/|$)/.test(pathname || '');
   return (
-    <header className={`header ${inActivity ? 'in-activity' : ''}`}>
+    <header className={`header ${inActivity ? 'in-activity' : ''} ${sticky ? 'is-sticky' : ''}`}>
       <Link href="/" className="brand" aria-label={`laughtime.lol – ${t('nav.home')}`}>
         <img src="/logo-mark.svg" alt="" width="62" height="30" className="brand-mark" />
         <span className="brand-text">

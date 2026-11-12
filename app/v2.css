@@ -1,7 +1,74 @@
 /* ------------------------------------------------------------------
-   LaughTime v2 – shared design tokens for the polish pass.
+   LaughTime v2 – shared design tokens and the polish layer.
    The look stays the same (ink outlines, hard shadows, party colours);
-   these add depth, glow and smoother motion on top of it.
+   this file adds depth, glow and smoother motion on top of it.
+
+   HOW TO USE IT (for everyone who styles a v2 screen)
+
+   Tokens (all on :root)
+     colours     --bg --bg-2 --ink --card --yellow --pink --cyan --green --orange
+                 (app/globals.css), text-safe variants for cream cards:
+                 --pink-ink --green-ink --red-ink --purple-ink
+     spacing     --space-1 … --space-7      4 8 12 16 22 32 48 px
+     radii       --radius-xs 8  --radius-sm 12  --radius-md 14  --radius 20
+                 --radius-pill 999px
+     outlines    --border (3px ink)  --shadow / --shadow-sm (hard offset shadow)
+                 --shadow-ambient (soft depth below the hard shadow)
+     glass       --glass-bg --glass-bg-strong --glass-border --glass-blur
+                 --glass-card (frosted cream)  --scrim (dialog backdrop)
+     glow        --glow-yellow --glow-pink --glow-cyan --glow-green
+     motion      --ease-out (entrances)  --ease-spring (presses, pops)
+                 --ease-in (exits)  --ease-in-out (loops)
+                 --dur-fast 120ms  --dur 220ms  --dur-slow 420ms  --dur-page 260ms
+                 --stagger 45ms (delay between list items)
+     focus       --ring (colour of the focus ring; cards switch it to deep pink)
+     layers      --z-header 45  --z-dialog 50  --z-toast 60  --z-tip 70
+     layout      --sticky-top  height of the sticky header (0px where it is not
+                 sticky) – use  top: calc(var(--sticky-top) + 12px)  for your own
+                 sticky panels
+
+   Motion rules
+     - animate transform / translate / scale / rotate and opacity only. The one
+       exception is the hard shadow of a pressed button (tiny area, 60–220ms).
+     - entrances use "from" keyframes only and the translate/scale properties,
+       so they never fight with a transform the element already has.
+     - hover effects go inside @media (hover: hover); every press gets feedback.
+     - nothing here needs extra care for prefers-reduced-motion: globals.css
+       switches all animations and transitions off, this file removes the loops.
+
+   Utility classes
+     .v2-rise            entrance: fade + rise (cards get it automatically)
+     .v2-pop             entrance: springy pop (badges, icons, confirmations)
+     .v2-fade            entrance: fade only (table rows, text)
+     .v2-stagger         children enter one after the other (first 12 are delayed);
+                         already active on .meme-grid .steps .stat-grid .mini-board
+     .v2-press           springy press feedback for a custom clickable element
+     .v2-lift            hover lift (pointer devices only)
+     .v2-glass           dark frosted panel (solid fallback without backdrop-filter)
+     .v2-glass-bar       the same as a floating pill/bar with a soft shadow
+     .v2-glow-yellow | -pink | -cyan | -green     glow accent around an element
+     .v2-live-dot        pulsing "live" dot (add .is-pink / .is-yellow to recolour)
+     .skeleton           loading placeholder with a shimmer; give it a size or use
+       .skeleton-text    … one line of text (add .is-short / .is-medium)
+       .skeleton-circle  … an avatar (set width)
+       .skeleton-block   … a media area (set aspect-ratio or height)
+                         put aria-hidden="true" on the placeholder and
+                         aria-busy="true" on the region that is loading
+     .tnum               tabular numbers (scores, timers, counters)
+     .balance            balanced line breaks for a short text
+     [data-tip="…"]      small tooltip above an element on hover/keyboard focus
+                         (add data-tip-pos="bottom" to show it below); the element
+                         must not use ::after itself – keep aria-label / title too
+     .input-wrap + .input-action   button inside an input (show password, clear)
+     .input.is-invalid / [aria-invalid="true"], .input.is-valid   validation
+     .modal-backdrop.is-closing    plays the closing animation of a dialog –
+                         components/ui/useDialog.js does that (plus focus trap,
+                         Escape and returning the focus)
+
+   View transitions
+     Page changes cross-fade through React's <ViewTransition> in SanctionGate
+     (class v2-page). To let one element morph between two pages give it the
+     same  view-transition-name  on both.
    ------------------------------------------------------------------ */
 :root {
   /* glass surfaces on the dark background */
@@ -20,4 +87,894 @@
   --dur-fast: 120ms;
   --dur: 220ms;
   --dur-slow: 420ms;
+
+  /* --- added by the polish pass --- */
+  --ease-in: cubic-bezier(0.5, 0, 0.9, 0.4);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --dur-page: 260ms;
+  --stagger: 45ms;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 22px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --radius-xs: 8px;
+  --radius-md: 14px;
+  --radius-pill: 999px;
+  --shadow-ambient: 0 22px 36px -22px rgba(8, 2, 22, 0.75);
+  --glass-card: rgba(255, 248, 236, 0.9);
+  --scrim: rgba(10, 4, 24, 0.74);
+  /* colours that keep 4.5:1 on cream cards */
+  --pink-ink: #b0126a;
+  --green-ink: #14753a;
+  --red-ink: #b3174f;
+  --purple-ink: #6a4d99;
+  --ring: var(--cyan);
+  --ring-on-card: #b0126a;
+  --z-header: 45;
+  --z-dialog: 50;
+  --z-toast: 60;
+  --z-tip: 70;
+  --sticky-top: 0px;
+}
+
+/* ------------------------------------------------------------------
+   Base: type and selection (the themed scrollbars live in app/modes.css)
+   ------------------------------------------------------------------ */
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-optical-sizing: auto;
+  accent-color: var(--pink);
+}
+
+:where(h1, h2, h3, .balance) {
+  text-wrap: balance;
+}
+
+:where(p, li, dd, figcaption) {
+  text-wrap: pretty;
+}
+
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+::selection {
+  background: var(--pink);
+  color: var(--ink);
+}
+
+/* crisp vector edges at every size */
+.icon {
+  shape-rendering: geometricPrecision;
+}
+
+:where(a, button, summary, label, input, select, textarea) {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ------------------------------------------------------------------
+   Motion: entrances
+   ------------------------------------------------------------------ */
+@keyframes v2-rise {
+  from {
+    opacity: 0;
+    translate: 0 14px;
+    scale: 0.985;
+  }
+}
+
+@keyframes v2-pop {
+  from {
+    opacity: 0;
+    scale: 0.6;
+  }
+}
+
+@keyframes v2-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes v2-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+
+.v2-rise {
+  animation: v2-rise var(--dur-slow) var(--ease-out) backwards;
+}
+
+.v2-pop {
+  animation: v2-pop var(--dur-slow) var(--ease-spring) backwards;
+}
+
+.v2-fade {
+  animation: v2-fade var(--dur-slow) var(--ease-out) backwards;
+}
+
+/* every card arrives with a short rise; :where() keeps the specificity at zero,
+   so a card with its own animation (pop-in, result cards …) keeps it */
+:where(.card, .stat-tile, .empty-note) {
+  animation: v2-rise var(--dur-slow) var(--ease-out) backwards;
+}
+
+/* lists: one after the other */
+:where(.v2-stagger, .meme-grid, .steps, .stat-grid, .mini-board, .feature-list) > * {
+  animation: v2-rise var(--dur-slow) var(--ease-out) backwards;
+  animation-delay: calc(var(--stagger) * var(--v2-i, 12));
+}
+
+:where(.v2-stagger, .meme-grid, .steps, .stat-grid, .mini-board, .feature-list) > :nth-child(1) {
+  --v2-i: 0;
+}
+
+:where(.v2-stagger, .meme-grid, .steps, .stat-grid, .mini-board, .feature-list) > :nth-child(2) {
+  --v2-i: 1;
+}
+
+:where(.v2-stagger, .meme-grid, .steps, .stat-grid, .mini-board, .feature-list) > :nth-child(3) {
+  --v2-i: 2;
+}
+
+:where(.v2-stagger, .meme-grid, .steps, .stat-grid, .mini-board, .feature-list) > :nth-child(4) {
+  --v2-i: 3;
+}
+
+:where(.v2-stagger, .meme-grid, .steps, .stat-grid, .mini-board, .feature-list) > :nth-child(5) {
+  --v2-i: 4;
+}
+
+:where(.v2-stagger, .meme-grid, .steps, .stat-grid, .mini-board, .feature-list) > :nth-child(6) {
+  --v2-i: 5;
+}
+
+:where(.v2-stagger, .meme-grid, .steps, .stat-grid, .mini-board, .feature-list) > :nth-child(7) {
+  --v2-i: 6;
+}
+
+:where(.v2-stagger, .meme-grid, .steps, .stat-grid, .mini-board, .feature-list) > :nth-child(8) {
+  --v2-i: 7;
+}
+
+:where(.v2-stagger, .meme-grid, .steps, .stat-grid, .mini-board, .feature-list) > :nth-child(9) {
+  --v2-i: 8;
+}
+
+:where(.v2-stagger, .meme-grid, .steps, .stat-grid, .mini-board, .feature-list) > :nth-child(10) {
+  --v2-i: 9;
+}
+
+:where(.v2-stagger, .meme-grid, .steps, .stat-grid, .mini-board, .feature-list) > :nth-child(11) {
+  --v2-i: 10;
+}
+
+:where(.v2-stagger, .meme-grid, .steps, .stat-grid, .mini-board, .feature-list) > :nth-child(12) {
+  --v2-i: 11;
+}
+
+/* table rows cannot be moved reliably – they fade */
+.lb-table tbody tr {
+  animation: v2-fade var(--dur-slow) var(--ease-out) backwards;
+}
+
+.lb-table tbody tr:nth-child(-n + 12) {
+  animation-delay: calc(var(--stagger) * 0.7 * var(--v2-row, 0));
+}
+
+.lb-table tbody tr:nth-child(2) { --v2-row: 1; }
+.lb-table tbody tr:nth-child(3) { --v2-row: 2; }
+.lb-table tbody tr:nth-child(4) { --v2-row: 3; }
+.lb-table tbody tr:nth-child(5) { --v2-row: 4; }
+.lb-table tbody tr:nth-child(6) { --v2-row: 5; }
+.lb-table tbody tr:nth-child(7) { --v2-row: 6; }
+.lb-table tbody tr:nth-child(8) { --v2-row: 7; }
+.lb-table tbody tr:nth-child(9) { --v2-row: 8; }
+.lb-table tbody tr:nth-child(10) { --v2-row: 9; }
+.lb-table tbody tr:nth-child(11) { --v2-row: 10; }
+.lb-table tbody tr:nth-child(12) { --v2-row: 11; }
+
+/* ------------------------------------------------------------------
+   Motion: press and hover
+   ------------------------------------------------------------------ */
+/* Every button answers a press, also the ones without a style of their own.
+   "scale" is separate from "transform", so this adds to existing press moves. */
+:where(button, [role='button'], summary, .v2-press):where(:not(:disabled, .btn)) {
+  transition: scale var(--dur-fast) var(--ease-spring);
+}
+
+:where(button, [role='button'], summary, .v2-press):where(:not(:disabled, .btn)):active {
+  scale: 0.96;
+}
+
+.v2-press {
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+@media (hover: hover) {
+  .v2-lift {
+    transition: translate var(--dur) var(--ease-spring);
+  }
+
+  .v2-lift:hover {
+    translate: 0 -4px;
+  }
+
+  /* Cards that are links or open something lift a little. A lifted card would
+     become the anchor of a dialog rendered inside it, hence the :has() guard. */
+  :is(a.card, .meme-card, .showcase-card) {
+    transition: translate var(--dur) var(--ease-spring);
+  }
+
+  :is(a.card, .meme-card, .showcase-card):hover:not(:has(.modal-backdrop)) {
+    translate: 0 -4px;
+  }
+
+  .footer a:hover {
+    color: var(--white);
+  }
+}
+
+/* text links: a calmer underline that does not cut through descenders */
+:where(a) {
+  text-decoration-thickness: 2px;
+  text-underline-offset: 0.18em;
+}
+
+/* ------------------------------------------------------------------
+   Depth: cards, glass, glow
+   ------------------------------------------------------------------ */
+.v2-glass,
+.v2-glass-bar {
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius);
+  background: var(--glass-bg-strong);
+  color: var(--white);
+}
+
+.v2-glass-bar {
+  border-radius: var(--radius-pill);
+  box-shadow: 0 18px 40px -18px rgba(0, 0, 0, 0.85);
+}
+
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .v2-glass,
+  .v2-glass-bar {
+    background: var(--glass-bg);
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.4);
+    backdrop-filter: blur(var(--glass-blur)) saturate(1.4);
+  }
+}
+
+.v2-glow-yellow {
+  box-shadow: var(--glow-yellow);
+}
+
+.v2-glow-pink {
+  box-shadow: var(--glow-pink);
+}
+
+.v2-glow-cyan {
+  box-shadow: var(--glow-cyan);
+}
+
+.v2-glow-green {
+  box-shadow: var(--glow-green);
+}
+
+/* live indicator: the ring grows with transform, nothing is repainted */
+.v2-live-dot {
+  --live: var(--green);
+  position: relative;
+  display: inline-block;
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--live);
+  box-shadow: 0 0 10px var(--live);
+}
+
+.v2-live-dot.is-pink {
+  --live: var(--pink);
+}
+
+.v2-live-dot.is-yellow {
+  --live: var(--yellow);
+}
+
+.v2-live-dot::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: var(--live);
+  animation: v2-live 1.8s var(--ease-out) infinite;
+}
+
+@keyframes v2-live {
+  from {
+    opacity: 0.7;
+    transform: scale(1);
+  }
+
+  to {
+    opacity: 0;
+    transform: scale(3.2);
+  }
+}
+
+/* ------------------------------------------------------------------
+   Backdrop: two slow colour clouds behind the dots
+   ------------------------------------------------------------------ */
+.bg-dots::before,
+.bg-dots::after {
+  content: '';
+  position: absolute;
+  width: 52vmax;
+  height: 52vmax;
+  border-radius: 50%;
+}
+
+.bg-dots::before {
+  left: -14vmax;
+  top: 30%;
+  background: radial-gradient(closest-side, rgba(53, 224, 255, 0.13), transparent);
+}
+
+.bg-dots::after {
+  right: -12vmax;
+  top: -18vmax;
+  background: radial-gradient(closest-side, rgba(255, 79, 163, 0.17), transparent);
+}
+
+/* They only drift on big screens with a pointer: a phone should not keep its
+   GPU busy for a backdrop. Compositor animations produce no frames while the
+   tab is hidden; under a dialog (and its blur) they wait. */
+@media (hover: hover) and (min-width: 961px) and (prefers-reduced-motion: no-preference) {
+  .bg-dots::before {
+    animation: v2-drift-a 44s var(--ease-in-out) infinite alternate;
+  }
+
+  .bg-dots::after {
+    animation: v2-drift-b 56s var(--ease-in-out) infinite alternate;
+  }
+
+  body:has(.modal-backdrop) .bg-dots::before,
+  body:has(.modal-backdrop) .bg-dots::after {
+    animation-play-state: paused;
+  }
+}
+
+@keyframes v2-drift-a {
+  to {
+    transform: translate3d(16vmax, -12vmax, 0) scale(1.18);
+  }
+}
+
+@keyframes v2-drift-b {
+  to {
+    transform: translate3d(-18vmax, 14vmax, 0) scale(0.86);
+  }
+}
+
+/* ------------------------------------------------------------------
+   Header: sticky glass bar on browse pages (class is-sticky, see Header.jsx)
+   ------------------------------------------------------------------ */
+@media (min-width: 961px) {
+  .header.is-sticky {
+    position: sticky;
+    top: 0;
+    z-index: var(--z-header);
+    /* full width bar, content stays on the page grid */
+    max-width: none;
+    padding-inline: max(20px, calc((100% - var(--page)) / 2 + 20px));
+  }
+
+  .header.is-sticky::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-bottom: 1px solid var(--glass-border);
+    background: var(--glass-bg-strong);
+    box-shadow: 0 14px 30px -20px rgba(0, 0, 0, 0.9);
+    pointer-events: none;
+  }
+
+  @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .header.is-sticky::before {
+      background: rgba(30, 11, 64, 0.7);
+      -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.5);
+      backdrop-filter: blur(var(--glass-blur)) saturate(1.5);
+    }
+  }
+
+  /* at the very top the header is as open as it always was; the glass comes
+     in with the first scroll (browsers without scroll timelines always show it) */
+  @supports (animation-timeline: scroll()) {
+    .header.is-sticky::before {
+      /* stays hidden on a page that cannot scroll (no timeline, no animation) */
+      opacity: 0;
+      animation: v2-glass-in linear both;
+      animation-timeline: scroll(root block);
+      animation-range: 0 80px;
+    }
+  }
+
+  body:has(.header.is-sticky) {
+    --sticky-top: 68px;
+  }
+
+  html:has(.header.is-sticky) {
+    scroll-padding-top: 84px;
+  }
+}
+
+@keyframes v2-glass-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+/* frosted cream for the menu that floats over the page */
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .account-dropdown.card {
+    background: var(--glass-card);
+    -webkit-backdrop-filter: blur(12px) saturate(1.5);
+    backdrop-filter: blur(12px) saturate(1.5);
+  }
+}
+
+.account-placeholder {
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.footer {
+  position: relative;
+}
+
+/* a hairline that fades out to both sides */
+.footer::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: min(var(--page), 100% - 40px);
+  height: 1px;
+  translate: -50% 0;
+  background: linear-gradient(90deg, transparent, var(--glass-border) 20%, var(--glass-border) 80%, transparent);
+}
+
+.footer a {
+  text-decoration-color: rgba(201, 184, 236, 0.5);
+}
+
+/* ------------------------------------------------------------------
+   Dialogs
+   ------------------------------------------------------------------ */
+.modal-backdrop {
+  z-index: var(--z-dialog);
+  background: var(--scrim);
+  animation: v2-fade var(--dur) var(--ease-out) both;
+  overscroll-behavior: contain;
+}
+
+/* blur only where it is cheap: a pointer device with a big screen */
+@media (hover: hover) and (min-width: 721px) {
+  @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .modal-backdrop {
+      background: rgba(10, 4, 24, 0.6);
+      -webkit-backdrop-filter: blur(7px) saturate(1.2);
+      backdrop-filter: blur(7px) saturate(1.2);
+    }
+  }
+}
+
+.modal-backdrop > :where(.modal, [role='dialog']) {
+  animation: v2-dialog-in 340ms var(--ease-spring) both;
+  overscroll-behavior: contain;
+}
+
+/* a dialog is focused as a whole when it opens – no ring around the whole card */
+.modal:focus,
+[role='dialog']:focus {
+  outline: none;
+}
+
+.modal-backdrop.is-closing {
+  animation: v2-fade-out 170ms var(--ease-in) forwards;
+  pointer-events: none;
+}
+
+.modal-backdrop.is-closing > :where(.modal, [role='dialog']) {
+  animation: v2-dialog-out 170ms var(--ease-in) forwards;
+}
+
+@keyframes v2-dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.92);
+  }
+}
+
+@keyframes v2-dialog-out {
+  to {
+    opacity: 0;
+    transform: translateY(10px) scale(0.96);
+  }
+}
+
+/* ------------------------------------------------------------------
+   Forms
+   ------------------------------------------------------------------ */
+.input:focus-visible {
+  outline-offset: 2px;
+  box-shadow:
+    inset 0 3px 0 rgba(23, 10, 46, 0.08),
+    0 0 0 6px rgba(255, 79, 163, 0.18);
+}
+
+.input:disabled {
+  background: #efe7f8;
+  color: var(--muted);
+  cursor: not-allowed;
+  opacity: 0.8;
+}
+
+.input.is-invalid,
+.input[aria-invalid='true'],
+.input:user-invalid {
+  border-color: var(--red-ink);
+  background: #fff3f7;
+}
+
+.input.is-valid {
+  border-color: var(--green-ink);
+  background: #f3fff1;
+}
+
+/* a wrong form says so with a short shake */
+.form-error {
+  animation: v2-shake 380ms var(--ease-out) both;
+}
+
+@keyframes v2-shake {
+  0% {
+    opacity: 0;
+    transform: translateX(0);
+  }
+
+  20% {
+    opacity: 1;
+    transform: translateX(-7px);
+  }
+
+  45% {
+    transform: translateX(6px);
+  }
+
+  70% {
+    transform: translateX(-3px);
+  }
+
+  100% {
+    transform: translateX(0);
+  }
+}
+
+/* hint on the left, counter on the right */
+.field-hint:has(> .field-count) {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.field-hint.good {
+  color: var(--green-ink);
+}
+
+.field-hint.bad {
+  color: var(--red-ink);
+}
+
+.field-hint.warn {
+  color: #8a4a00;
+  font-weight: 600;
+}
+
+.field-count {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.field-count.is-full {
+  color: var(--red-ink);
+  font-weight: 600;
+}
+
+/* button inside an input (show password, clear …) */
+.input-wrap {
+  position: relative;
+  display: block;
+}
+
+.input-wrap > .input {
+  padding-right: 52px;
+}
+
+.input-action {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  margin-top: -20px;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--purple-ink);
+  cursor: pointer;
+}
+
+.input-action[aria-pressed='true'] {
+  color: var(--pink-ink);
+}
+
+@media (hover: hover) {
+  .input-action:hover {
+    background: rgba(23, 10, 46, 0.07);
+    color: var(--ink);
+  }
+}
+
+.label {
+  letter-spacing: 0.005em;
+}
+
+/* ------------------------------------------------------------------
+   Tooltips
+   ------------------------------------------------------------------ */
+:where([data-tip]) {
+  position: relative;
+}
+
+[data-tip]::after {
+  content: attr(data-tip);
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 10px);
+  z-index: var(--z-tip);
+  width: max-content;
+  max-width: 220px;
+  padding: 4px 10px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-xs);
+  background: var(--ink);
+  color: var(--white);
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.3;
+  text-align: center;
+  white-space: normal;
+  box-shadow: 0 10px 24px -10px rgba(0, 0, 0, 0.9);
+  pointer-events: none;
+  opacity: 0;
+  translate: -50% 4px;
+  transition:
+    opacity var(--dur-fast) var(--ease-out),
+    translate var(--dur-fast) var(--ease-out);
+}
+
+[data-tip][data-tip-pos='bottom']::after {
+  top: calc(100% + 10px);
+  bottom: auto;
+  translate: -50% -4px;
+}
+
+[data-tip]:focus-visible::after {
+  opacity: 1;
+  translate: -50% 0;
+}
+
+@media (hover: hover) {
+  [data-tip]:hover::after {
+    opacity: 1;
+    translate: -50% 0;
+    /* not on every pass of the pointer */
+    transition-delay: 350ms;
+  }
+}
+
+/* ------------------------------------------------------------------
+   Loading and empty states
+   ------------------------------------------------------------------ */
+.skeleton {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.1);
+  color: transparent;
+  pointer-events: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.card .skeleton {
+  background: rgba(23, 10, 46, 0.1);
+}
+
+.skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 20%, rgba(255, 255, 255, 0.28) 50%, transparent 80%);
+  transform: translateX(-100%);
+  animation: v2-shimmer 1.4s var(--ease-in-out) infinite;
+}
+
+.card .skeleton::after {
+  background: linear-gradient(100deg, transparent 20%, rgba(255, 255, 255, 0.75) 50%, transparent 80%);
+}
+
+@keyframes v2-shimmer {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+.skeleton-text {
+  height: 0.85em;
+  margin: 0.45em 0;
+  border-radius: var(--radius-pill);
+}
+
+.skeleton-text.is-short {
+  width: 35%;
+}
+
+.skeleton-text.is-medium {
+  width: 65%;
+}
+
+.skeleton-circle {
+  width: 44px;
+  aspect-ratio: 1;
+  border-radius: 50%;
+}
+
+.skeleton-block {
+  width: 100%;
+  min-height: 48px;
+}
+
+.spinner {
+  /* the track is part of the look on dark and on cream */
+  animation-timing-function: cubic-bezier(0.5, 0.15, 0.5, 0.85);
+}
+
+.page-center {
+  color: var(--muted-on-dark);
+  font-weight: 600;
+  text-align: center;
+}
+
+.empty-card {
+  text-wrap: balance;
+}
+
+.big-icon {
+  animation: v2-pop var(--dur-slow) var(--ease-spring) backwards;
+  animation-delay: 120ms;
+}
+
+/* ------------------------------------------------------------------
+   Headings
+   ------------------------------------------------------------------ */
+/* section headings share one ornament: three dots in the party colours */
+.section-title::after {
+  content: '';
+  display: block;
+  width: 64px;
+  height: 8px;
+  margin: 12px auto 0;
+  border-radius: var(--radius-pill);
+  background:
+    radial-gradient(circle at 4px 4px, var(--yellow) 3.5px, transparent 4px),
+    radial-gradient(circle at 32px 4px, var(--pink) 3.5px, transparent 4px),
+    radial-gradient(circle at 60px 4px, var(--cyan) 3.5px, transparent 4px);
+}
+
+.page-head h1,
+.section-row h2 {
+  letter-spacing: -0.015em;
+}
+
+/* ------------------------------------------------------------------
+   Page changes (View Transitions, where the browser has them)
+   ------------------------------------------------------------------ */
+@view-transition {
+  navigation: auto;
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 180ms;
+}
+
+::view-transition-old(.v2-page) {
+  animation: v2-page-out 110ms var(--ease-in) both;
+}
+
+::view-transition-new(.v2-page) {
+  animation: v2-page-in var(--dur-page) var(--ease-out) 70ms both;
+}
+
+::view-transition-group(.v2-page) {
+  animation-duration: var(--dur-page);
+  animation-timing-function: var(--ease-out);
+}
+
+/* the yellow pill of the navigation slides to its new place */
+::view-transition-group(nav-active) {
+  animation-duration: 320ms;
+  animation-timing-function: var(--ease-out);
+}
+
+@keyframes v2-page-out {
+  to {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
+@keyframes v2-page-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+
+/* ------------------------------------------------------------------
+   Less motion
+   ------------------------------------------------------------------ */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+
+  .skeleton::after,
+  .v2-live-dot::after {
+    display: none;
+  }
+
+  /* the glass of the header follows the scroll position, not a clock: keep it */
+  .header.is-sticky::before {
+    animation-duration: auto !important;
+  }
+
+  :where(button, [role='button'], summary, .v2-press):active,
+  .v2-lift:hover,
+  :is(a.card, .meme-card, .showcase-card):hover {
+    scale: none;
+    translate: none;
+  }
 }

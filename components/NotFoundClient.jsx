@@ -7,16 +7,29 @@ import { useApp } from './Providers';
 export default function NotFoundClient() {
   const { t } = useApp();
   return (
-    <div className="page-narrow center">
+    <div className="page-narrow center not-found">
       <div className="card">
-        <div className="big-icon">
-          <Icon name="search-x" size={56} />
+        {/* the digits tumble in one after the other (app/community.css) */}
+        <p className="nf-code" aria-hidden="true">
+          <span>4</span>
+          <span className="nf-zero">
+            <Icon name="search-x" size={56} />
+          </span>
+          <span>4</span>
+        </p>
+        <h1>
+          <span className="sr-only">404 – </span>
+          {t('ui.notFound.title')}
+        </h1>
+        <p className="muted">{t('ui.notFound.text')}</p>
+        <div className="row-center">
+          <Link className="btn btn-yellow" href="/">
+            <Icon name="play" size={18} /> {t('common.backHome')}
+          </Link>
+          <Link className="btn btn-white" href="/memes">
+            <Icon name="trophy" size={18} /> {t('ui.notFound.memes')}
+          </Link>
         </div>
-        <h1>404</h1>
-        <p>{t('err.room_not_found')}</p>
-        <Link className="btn btn-yellow" href="/">
-          {t('common.backHome')}
-        </Link>
       </div>
     </div>
   );

@@ -18,6 +18,39 @@ function useFlash() {
   return [msg, setMsg];
 }
 
+/** Placeholder in the shape of the page while the account is loading. */
+function AccountSkeleton({ label }) {
+  return (
+    <div className="page-wide account-page" aria-busy="true">
+      <p className="sr-only" role="status">
+        {label}
+      </p>
+      <div className="page-head" aria-hidden="true">
+        <span className="skeleton skeleton-block account-skeleton-title" />
+      </div>
+      <div className="account-grid" aria-hidden="true">
+        <div className="card">
+          <span className="skeleton skeleton-text is-short" />
+          <span className="skeleton skeleton-block top-gap" />
+          <span className="skeleton skeleton-block top-gap account-skeleton-area" />
+          <span className="skeleton skeleton-block top-gap" />
+        </div>
+        <div className="stack">
+          <div className="card">
+            <span className="skeleton skeleton-text is-medium" />
+            <span className="skeleton skeleton-text" />
+            <span className="skeleton skeleton-text is-short" />
+          </div>
+          <div className="card">
+            <span className="skeleton skeleton-text is-short" />
+            <span className="skeleton skeleton-block top-gap" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function errorText(t, code) {
   const key = `auth.err.${code}`;
   const txt = t(key);
@@ -55,7 +88,7 @@ export default function AccountPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  if (!account) return <div className="page-center">{t('common.loading')}</div>;
+  if (!account) return <AccountSkeleton label={t('common.loading')} />;
 
   async function run(key, fn, okText) {
     setBusy(key);
@@ -132,7 +165,7 @@ export default function AccountPage() {
 
       {flash && (
         <p className={`flash ${flash.ok ? 'ok' : 'bad'}`} role="status">
-          {flash.text}
+          <Icon name={flash.ok ? 'check-circle' : 'alert'} size={20} /> {flash.text}
         </p>
       )}
 
@@ -156,11 +189,22 @@ export default function AccountPage() {
             maxLength={160}
             value={bio}
             placeholder={t('account.bioPlaceholder')}
+            aria-describedby="acc-bio-count"
             onChange={(e) => setBio(e.target.value)}
           />
+          <p className="field-hint">
+            <span
+              id="acc-bio-count"
+              className={`field-count ${bio.length >= 160 ? 'is-full' : ''}`}
+              aria-label={t('ui.charCount', { n: bio.length, max: 160 })}
+            >
+              {bio.length} / 160
+            </span>
+          </p>
           <span className="label">{t('home.avatarLabel')}</span>
           {avatar && <AvatarPicker value={avatar} onChange={setAvatar} />}
-          <button type="submit" className="btn btn-yellow btn-block top-gap" disabled={busy === 'profile'}>
+          <button type="submit" className="btn btn-yellow btn-block top-gap" disabled={busy === 'profile'} aria-busy={busy === 'profile'}>
+            {busy === 'profile' && <span className="spinner tiny" aria-hidden="true" />}
             {t('common.save')}
           </button>
         </form>

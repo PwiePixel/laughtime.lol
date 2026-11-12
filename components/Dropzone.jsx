@@ -11,6 +11,8 @@ export default function Dropzone({ onFile, progress = null, maxMb = 8, disabled 
   const { t } = useApp();
   const [over, setOver] = useState(false);
   const input = useRef(null);
+  // dragenter/dragleave also fire for every child: count them instead of toggling
+  const depth = useRef(0);
   const busy = progress !== null;
 
   useEffect(() => {
@@ -31,13 +33,20 @@ export default function Dropzone({ onFile, progress = null, maxMb = 8, disabled 
   return (
     <label
       className={`dropzone ${over ? 'is-over' : ''} ${busy ? 'is-busy' : ''} ${compact ? 'is-compact' : ''} ${disabled ? 'is-disabled' : ''}`}
-      onDragOver={(e) => {
+      aria-busy={busy || undefined}
+      onDragEnter={(e) => {
         e.preventDefault();
-        if (!disabled) setOver(true);
+        depth.current += 1;
+        if (!disabled && !busy) setOver(true);
       }}
-      onDragLeave={() => setOver(false)}
+      onDragOver={(e) => e.preventDefault()}
+      onDragLeave={() => {
+        depth.current = Math.max(0, depth.current - 1);
+        if (!depth.current) setOver(false);
+      }}
       onDrop={(e) => {
         e.preventDefault();
+        depth.current = 0;
         setOver(false);
         const f = fileFromEvent(e);
         if (f && !disabled && !busy) onFile(f);
@@ -59,7 +68,7 @@ export default function Dropzone({ onFile, progress = null, maxMb = 8, disabled 
         {busy ? <span className="dl-progress" style={{ '--p': `${progress * 3.6}deg` }}><span>{progress}</span></span> : <Icon name="image-up" size={compact ? 26 : 40} />}
       </span>
       <span className="dropzone-text">
-        <strong>{busy ? t('upload.uploading', { n: progress }) : t('upload.drop')}</strong>
+        <strong>{busy ? t('upload.uploading', { n: progress }) : over ? t('ui.upload.release') : t('upload.drop')}</strong>
         <small>{t('upload.types', { n: maxMb })}</small>
       </span>
     </label>
