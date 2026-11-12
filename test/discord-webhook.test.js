@@ -253,6 +253,7 @@ test('moderators: the test message reaches the moderators\' webhook only', async
   assert.equal(received.length, 1);
   assert.equal(received[0].path, HOOK_PATH);
   const embed = JSON.parse(received[0].body).embeds[0];
-  assert.equal(embed.title, 'Neue Arbeit im Admin-Bereich');
+  assert.equal(embed.title, 'Testnachricht');
+  assert.match(embed.description, /Admin-Bereich öffnen/);
   assert.match(embed.url, /\/admin$/);
 });

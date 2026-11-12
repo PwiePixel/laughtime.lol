@@ -1,20 +1,13 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import ActivityBoot from './activity/ActivityBoot';
-import ActivityOutside from './activity/ActivityOutside';
 
-function Loading() {
-  return (
-    <div className="activity-shell">
-      <ActivityBoot step="connect" />
-    </div>
-  );
-}
-
-// The activity (game views, Discord SDK helpers) is its own chunk: the start
-// page imports this file too, and normal visitors must not download any of it.
+// The start page imports this file too, so it stays a stub: the activity
+// (game views, start screen, Discord SDK helpers) and the page shown outside of
+// Discord are their own chunks, and normal visitors download none of it.
+const Loading = () => <div className="activity-shell" aria-busy="true" />;
 const ActivityRoot = dynamic(() => import('./activity/ActivityRoot'), { loading: Loading });
+const ActivityOutside = dynamic(() => import('./activity/ActivityOutside'));
 
 /**
  * LaughTime as a Discord Activity (opened by Discord in a frame).

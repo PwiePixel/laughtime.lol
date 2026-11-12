@@ -1,7 +1,7 @@
 'use client';
 
 import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { openExternal } from '@/lib/activity';
+import { isActivityUrl, openExternal } from '@/lib/activity';
 import { forgetLogin, joinRoom, login, openConnection } from '@/lib/activityBoot';
 import { createPresenceThrottle } from '@/lib/activityPresence';
 import {
@@ -163,7 +163,11 @@ export default function ActivityRoot() {
   // the layout's header hides itself – this component shows the only one
   useLayoutEffect(() => {
     setActivityMode(true);
-    return () => setActivityMode(false);
+    // Inside Discord's frame the website header never comes back, even when
+    // another screen takes over (the ban notice): its links would leave the frame.
+    return () => {
+      if (!isActivityUrl()) setActivityMode(false);
+    };
   }, [setActivityMode]);
 
   // --- start-up ---------------------------------------------------------------------------
@@ -462,7 +466,6 @@ export default function ActivityRoot() {
   const shellClass = [
     'activity-shell',
     compact ? 'is-compact is-pip' : '',
-    layout === LAYOUT.GRID ? 'is-grid' : '',
     mobile ? 'is-mobile' : 'is-desktop',
   ]
     .filter(Boolean)

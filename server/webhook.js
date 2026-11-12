@@ -222,7 +222,18 @@ export function notifyModerators(kind, reason = null) {
 
 /** One test message to the moderators' channel (scripts/announce.mjs --mod-test). */
 export function sendModeratorTest() {
-  return post('DISCORD_MOD_WEBHOOK_URL', moderatorMessage({ report: { total: 1, reasons: new Map([['other', 1]]) } }));
+  const t = (key) => translate(lang(), key);
+  const adminUrl = `${publicUrl()}/admin`;
+  return post('DISCORD_MOD_WEBHOOK_URL', {
+    embeds: [
+      {
+        title: t('discord.mod.testTitle'),
+        description: `${t('discord.mod.testText')}\n\n[${t('discord.mod.open')}](${adminUrl})`,
+        url: adminUrl,
+        color: COLOR_MOD,
+      },
+    ],
+  });
 }
 
 /** only for tests */
