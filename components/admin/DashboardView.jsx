@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '@/lib/api';
 import { usePolling } from '@/lib/fetchCache';
+import AdminBetaTile from '../beta/AdminBetaTile';
 import Icon from '../Icon';
 import { useApp } from '../Providers';
 import { ChartTable, HBars, Legend, LineChart, SERIES, StackedColumns, StatTile, timeFormatter } from './Charts';
@@ -56,6 +57,7 @@ export default function DashboardView() {
         <StatTile icon={<Icon name="lock" size={22} />} value={nf.format(live.activeSanctions)} label={t('admin.kpi.sanctions')} />
         <StatTile icon={<Icon name="package" size={22} />} value={nf.format(live.pendingPacks)} label={t('admin.kpi.packs')} />
         <StatTile icon={<Icon name="user" size={22} />} value={nf.format(live.users)} label={t('admin.kpi.users')} />
+        <AdminBetaTile />
       </section>
 
       <div className="range-row" role="radiogroup" aria-label={t('admin.range')}>

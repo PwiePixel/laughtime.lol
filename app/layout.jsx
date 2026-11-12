@@ -3,8 +3,9 @@ import Footer from '@/components/Footer';
 import Header from '@/components/Header';
 import Providers from '@/components/Providers';
 import SanctionGate from '@/components/SanctionGate';
+import BetaGate from '@/components/beta/BetaGate';
 import PwaBoot from '@/components/v2/PwaBoot';
-import { BETA_COOKIE, betaEnabledFromEnv, betaHostsFromEnv, resolveChannel } from '@/lib/features';
+import { enabledFeatures, normalizeChannel, parseFeatureFlags } from '@/lib/features';
 import { LANG_COOKIE, normalizeLang, translate } from '@/lib/i18n';
 import { memeFont, uiFont } from './fonts';
 import './globals.css';
@@ -64,23 +65,26 @@ export const viewport = {
 export default async function RootLayout({ children }) {
   const store = await cookies();
   const lang = normalizeLang(store.get(LANG_COOKIE)?.value);
-  // main page and beta page are the same app: the channel only switches features on
+  // main page and beta page are the same app: the channel only switches features on.
+  // The custom server decides (host, opt-in, access – server/channel.js) and passes it along.
   const requestHeaders = await headers();
-  const channel = resolveChannel({
-    host: requestHeaders.get('x-forwarded-host') || requestHeaders.get('host') || '',
-    optedIn: store.get(BETA_COOKIE)?.value === '1',
-    betaHosts: betaHostsFromEnv(process.env),
-    enabled: betaEnabledFromEnv(process.env),
-  });
+  const channel = normalizeChannel(requestHeaders.get('x-lt-channel'));
+  const betaGate = requestHeaders.get('x-lt-beta-gate') || null;
+  const featureFlags = parseFeatureFlags(process.env.FEATURE_FLAGS).overrides;
+  const features = enabledFeatures(channel, featureFlags);
 
   return (
     <html lang={lang} className={`${uiFont.variable} ${memeFont.variable}`}>
       <body>
-        <Providers lang={lang} channel={channel} memeFontFamily={memeFont.style.fontFamily}>
+        <Providers lang={lang} channel={channel} features={features} featureFlags={featureFlags} memeFontFamily={memeFont.style.fontFamily}>
           <div className="bg-dots" aria-hidden="true" />
           <Header />
           <main className="main">
-            <SanctionGate>{children}</SanctionGate>
+            <SanctionGate>
+              <BetaGate reason={betaGate} mainUrl={process.env.PUBLIC_URL || 'https://laughtime.lol'}>
+                {children}
+              </BetaGate>
+            </SanctionGate>
           </main>
           <Footer />
           <PwaBoot />

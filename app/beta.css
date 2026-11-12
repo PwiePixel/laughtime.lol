@@ -1,1 +1,512 @@
-/* LaughTime v2 – beta */
+/* ------------------------------------------------------------------
+   LaughTime v2 – beta
+   Badge in the header, the /beta page, the live status card and the
+   notice on a restricted beta host. Tokens: globals.css + v2.css.
+   ------------------------------------------------------------------ */
+
+/* --- "BETA" pill next to the logo ----------------------------------- */
+.beta-badge {
+  display: inline-flex;
+  align-items: center;
+  /* sits right next to the logo; the two auto margins below keep the
+     navigation where it is without the badge */
+  margin: 0 auto 0 -6px;
+  padding: 2px 9px;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  background: var(--green);
+  color: var(--ink);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  line-height: 1.4;
+  text-decoration: none;
+  box-shadow: 0 3px 0 var(--ink);
+  transform: rotate(-4deg);
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+
+.beta-badge:hover {
+  transform: rotate(-4deg) translateY(-1px) scale(1.05);
+}
+
+.header > .beta-badge ~ .main-nav {
+  margin-right: auto;
+}
+
+/* --- /beta page ----------------------------------------------------------- */
+.beta-page {
+  display: grid;
+  gap: 22px;
+  max-width: 980px;
+  margin: 12px auto 0;
+}
+
+.beta-hero {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding: 18px 0 6px;
+  text-align: center;
+}
+
+.beta-hero h1 {
+  margin: 0;
+  font-size: clamp(2rem, 6vw, 3.2rem);
+}
+
+.beta-kicker,
+.beta-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 14px;
+  border: var(--border);
+  border-radius: 999px;
+  background: var(--green);
+  color: var(--ink);
+  font-size: 0.9rem;
+  font-weight: 700;
+  box-shadow: var(--shadow-sm);
+  transform: rotate(-2deg);
+}
+
+.beta-intro {
+  max-width: 62ch;
+  margin: 0;
+  color: var(--muted-on-dark);
+  font-size: 1.1rem;
+}
+
+.beta-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  gap: 22px;
+  align-items: start;
+}
+
+/* the switch */
+.beta-switch {
+  display: grid;
+  gap: 14px;
+}
+
+.beta-switch h2,
+.beta-list h2 {
+  margin: 0;
+}
+
+.beta-channels {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 4px;
+  border: var(--border);
+  border-radius: 16px;
+  background: #efe4d2;
+}
+
+.beta-channels span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 42px;
+  border: 2px solid transparent;
+  border-radius: 11px;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.beta-channels span.on {
+  border-color: var(--ink);
+  background: var(--yellow);
+  color: var(--ink);
+  box-shadow: 0 3px 0 var(--ink);
+}
+
+.beta-switch.is-beta .beta-channels span.on {
+  background: var(--green);
+}
+
+.beta-channel-text {
+  margin: 0;
+  font-weight: 600;
+}
+
+.beta-action {
+  display: grid;
+  gap: 10px;
+  min-height: 58px;
+  align-content: center;
+}
+
+.beta-action .spinner {
+  justify-self: center;
+}
+
+.beta-note {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 10px 14px;
+  border: 2px dashed rgba(23, 10, 46, 0.35);
+  border-radius: var(--radius-sm);
+  background: #f4ead9;
+  font-weight: 600;
+}
+
+.beta-note span {
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.beta-hint,
+.beta-switch .form-error {
+  margin: 0;
+}
+
+/* what is in beta */
+.beta-list {
+  display: grid;
+  gap: 14px;
+}
+
+.beta-list ul {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.beta-list li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+  padding: 12px;
+  border: 2px solid var(--ink);
+  border-radius: 16px;
+  background: var(--white);
+}
+
+.beta-item-icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 2px solid var(--ink);
+  border-radius: 12px;
+  color: var(--ink);
+  box-shadow: 0 3px 0 var(--ink);
+}
+
+.beta-item-text strong {
+  margin-right: 8px;
+  font-size: 1.05rem;
+}
+
+.beta-item-text p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.beta-item-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 10px;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  background: #e6ddf5;
+  font-size: 0.8rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.beta-item-state.on {
+  background: var(--green);
+}
+
+/* panels on the dark background */
+.beta-panel,
+.beta-status {
+  padding: 18px 20px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius);
+  background: var(--glass-bg);
+}
+
+.beta-panel h2,
+.beta-status h2 {
+  margin: 0 0 10px;
+  font-size: 1.15rem;
+}
+
+.beta-panel p {
+  margin: 0 0 12px;
+  color: var(--muted-on-dark);
+}
+
+.beta-know {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.beta-know li {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.beta-know .icon {
+  margin-top: 3px;
+  color: var(--green);
+}
+
+.beta-panel .beta-release {
+  margin: 14px 0 0;
+  font-size: 0.85rem;
+}
+
+.beta-more {
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+/* --- live server status (beta feature "liveStatus") --------------------- */
+.beta-status-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.beta-status-head h2 {
+  margin: 0;
+}
+
+.beta-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 2px 12px;
+  border-radius: 999px;
+  background: rgba(124, 255, 107, 0.14);
+  color: var(--green);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.beta-live-dot,
+.beta-source-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--green);
+}
+
+.beta-live-dot {
+  animation: beta-pulse 1.8s var(--ease-out) infinite;
+}
+
+@keyframes beta-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.45;
+    transform: scale(0.7);
+  }
+}
+
+.beta-status-tiles {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0;
+}
+
+.beta-status-tiles > div {
+  display: grid;
+  gap: 2px;
+  padding: 12px 14px;
+  border: var(--border);
+  border-radius: 16px;
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: var(--shadow-sm);
+}
+
+.beta-status-tiles dt {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.beta-status-tiles dd {
+  margin: 0;
+  font-size: clamp(1.5rem, 4vw, 2rem);
+  font-weight: 700;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.beta-sources {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  margin-top: 14px;
+}
+
+.beta-sources h3 {
+  margin: 0;
+  color: var(--muted-on-dark);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.beta-sources ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.beta-sources li {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 3px 12px;
+  border: 1px solid var(--glass-border);
+  border-radius: 999px;
+  background: var(--glass-bg-strong);
+  font-size: 0.9rem;
+}
+
+.beta-sources li span:last-child {
+  color: var(--muted-on-dark);
+}
+
+.beta-sources li.is-partial .beta-source-dot,
+.beta-sources li.is-loading .beta-source-dot {
+  background: var(--yellow);
+}
+
+.beta-sources li.is-error .beta-source-dot {
+  background: #ff5c5c;
+}
+
+.beta-status-error {
+  margin: 0;
+  color: var(--muted-on-dark);
+}
+
+.beta-status .spinner.on-dark {
+  border-color: rgba(255, 255, 255, 0.2);
+  border-top-color: var(--yellow);
+}
+
+/* --- notice on a restricted beta host ---------------------------------- */
+.beta-gate-page {
+  max-width: 620px;
+}
+
+.beta-gate {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  text-align: center;
+}
+
+.beta-gate h1,
+.beta-gate p {
+  margin: 0;
+}
+
+.beta-gate-icon {
+  display: grid;
+  place-items: center;
+  width: 88px;
+  height: 88px;
+  border: var(--border);
+  border-radius: 50%;
+  background: var(--cyan);
+  color: var(--ink);
+  box-shadow: var(--shadow);
+}
+
+.beta-gate-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+/* --- small screens ------------------------------------------------------- */
+@media (max-width: 860px) {
+  .beta-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .beta-status-tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 520px) {
+  .beta-badge {
+    margin-left: -4px;
+    padding: 1px 7px;
+    font-size: 0.66rem;
+  }
+
+  .beta-page {
+    gap: 16px;
+  }
+
+  .beta-intro {
+    font-size: 1rem;
+  }
+
+  .beta-list li {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .beta-item-state {
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  .beta-gate-actions .btn {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .beta-badge {
+    transition: none;
+  }
+
+  .beta-badge:hover {
+    transform: rotate(-4deg);
+  }
+
+  .beta-live-dot {
+    animation: none;
+  }
+}

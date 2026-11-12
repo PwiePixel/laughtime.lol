@@ -4,14 +4,18 @@ import { useRouter } from 'next/navigation';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { inActivity } from '@/lib/activity';
 import { api } from '@/lib/api';
+import { setFeatureOverrides } from '@/lib/features';
 import { LANG_COOKIE, normalizeLang, translate } from '@/lib/i18n';
 import { loadProfile, saveProfile } from '@/lib/profile';
 
 const AppCtx = createContext(null);
 const STREAMER_KEY = 'lt_streamer';
+const NO_FEATURES = [];
 
-export default function Providers({ lang: initialLang, channel = 'stable', memeFontFamily, children }) {
+export default function Providers({ lang: initialLang, channel = 'stable', features = NO_FEATURES, featureFlags = null, memeFontFamily, children }) {
   const router = useRouter();
+  // FEATURE_FLAGS of the server, so featureEnabled() in lib/features.js answers the same in the browser
+  setFeatureOverrides(featureFlags);
   const [lang, setLangState] = useState(normalizeLang(initialLang));
   const [guest, setGuest] = useState(null);
   // account: undefined = still loading, null = not logged in
@@ -109,12 +113,16 @@ export default function Providers({ lang: initialLang, channel = 'stable', memeF
   }, [guest, account]);
 
   const t = useCallback((key, vars) => translate(lang, key, vars), [lang]);
+  const hasFeature = useCallback((key) => features.includes(key), [features]);
 
   const value = useMemo(
     () => ({
       lang,
       // 'stable' or 'beta' (see lib/features.js)
       channel,
+      // enabled feature keys for this channel + hasFeature('key')
+      features,
+      hasFeature,
       setLang,
       t,
       profile,
@@ -133,7 +141,7 @@ export default function Providers({ lang: initialLang, channel = 'stable', memeF
       activityMode,
       setActivityMode,
     }),
-    [lang, channel, setLang, t, profile, updateProfile, memeFontFamily, account, refreshAccount, logout, discordEnabled, streamerMode, setStreamerMode, sanction, activityMode],
+    [lang, channel, features, hasFeature, setLang, t, profile, updateProfile, memeFontFamily, account, refreshAccount, logout, discordEnabled, streamerMode, setStreamerMode, sanction, activityMode],
   );
   return <AppCtx.Provider value={value}>{children}</AppCtx.Provider>;
 }
