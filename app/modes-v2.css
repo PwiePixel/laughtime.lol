@@ -806,6 +806,8 @@ button.strip-player {
 /* rating controls and result share one place - the meme above never moves */
 .vote-dock {
   display: grid;
+  /* first row: controls or result, same height either way - the reactions below stay put */
+  grid-template-rows: minmax(146px, auto) auto;
   align-content: start;
   gap: 10px;
   min-height: 216px;
@@ -1757,6 +1759,7 @@ button.strip-player {
     position: sticky;
     bottom: 0;
     z-index: 20;
+    grid-template-rows: minmax(128px, auto) auto;
     gap: 8px;
     min-height: 196px;
     margin: 6px -16px 0;

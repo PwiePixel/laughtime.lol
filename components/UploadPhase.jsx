@@ -23,7 +23,7 @@ function errText(t, code, vars) {
 }
 
 /** search tab: term, idea chips, result grid. Results live in the parent so a tab switch keeps them. */
-function SearchPick({ up, search, onSearch, onPick, picking }) {
+function SearchPick({ up, search, onSearch, onPick, picking, autoFocus }) {
   const { t } = useApp();
   const [q, setQ] = useState(search.q || '');
   const clean = q.trim();
@@ -49,7 +49,7 @@ function SearchPick({ up, search, onSearch, onPick, picking }) {
             className="input"
             value={q}
             maxLength={40}
-            autoFocus
+            autoFocus={autoFocus}
             enterKeyHint="search"
             autoComplete="off"
             autoCapitalize="off"
@@ -131,6 +131,7 @@ export default function UploadPhase({ game }) {
   const [picking, setPicking] = useState(null); // tile id or 'random' on its way to the server
   const [howOpen, setHowOpen] = useState(false);
   const lastSearch = useRef(0);
+  const viaKeys = useRef(false); // tab chosen with the arrow keys: the focus stays on the tabs
   const twoPlayers = state.players.filter((p) => p.connected).length <= 2;
   const done = up.done || 0;
   const total = up.total || 0;
@@ -259,7 +260,19 @@ export default function UploadPhase({ game }) {
                   </button>
                 </div>
               )}
-              <div className="tabs swap-tabs" role="tablist">
+              <div
+                className="tabs swap-tabs"
+                role="tablist"
+                onKeyDown={(e) => {
+                  // arrow keys move between the tabs
+                  const dir = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+                  if (!dir) return;
+                  const next = tabs[(tabs.findIndex((x) => x.id === tab) + dir + tabs.length) % tabs.length];
+                  viaKeys.current = true;
+                  setTab(next.id);
+                  document.getElementById(`swap-tab-${next.id}`)?.focus();
+                }}
+              >
                 {tabs.map((x) => (
                   <button
                     key={x.id}
@@ -268,8 +281,12 @@ export default function UploadPhase({ game }) {
                     id={`swap-tab-${x.id}`}
                     aria-selected={tab === x.id}
                     aria-controls="swap-panel"
+                    tabIndex={tab === x.id ? 0 : -1}
                     className={tab === x.id ? 'on' : ''}
-                    onClick={() => setTab(x.id)}
+                    onClick={() => {
+                      viaKeys.current = false;
+                      setTab(x.id);
+                    }}
                   >
                     <Icon name={x.icon} size={18} /> <span>{x.label}</span>
                   </button>
@@ -277,7 +294,7 @@ export default function UploadPhase({ game }) {
               </div>
               <div id="swap-panel" role="tabpanel" aria-labelledby={`swap-tab-${tab}`} className="swap-panel">
                 {tab === 'upload' && <Dropzone onFile={onFile} progress={progress} maxMb={info.uploadMaxMb} />}
-                {tab === 'search' && <SearchPick up={up} search={search} onSearch={runSearch} onPick={pickTile} picking={picking} />}
+                {tab === 'search' && <SearchPick up={up} search={search} onSearch={runSearch} onPick={pickTile} picking={picking} autoFocus={!viaKeys.current} />}
                 {tab === 'random' && (
                   <div className="swap-surprise">
                     <span className="big-icon is-pink" aria-hidden="true">
