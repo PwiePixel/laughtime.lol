@@ -1852,6 +1852,19 @@ button.strip-player {
     --stage-h: min(27vh, 250px);
   }
 
+  /* touch screens: the header buttons are finger-sized there (app/pwa.css) and the page
+     starts 12px lower - on short phones the picture gives that back, so the text box
+     still ends above the bar */
+  @media (pointer: coarse) and (max-height: 780px) {
+    .caption-phase.game-swap {
+      --stage-h: min(32vh - 20px, 250px);
+    }
+
+    .caption-phase.game-hunt {
+      --stage-h: min(27vh - 12px, 250px);
+    }
+  }
+
   .hunt-more {
     gap: 8px;
     padding-bottom: 10px;
@@ -2118,6 +2131,13 @@ button.strip-player {
 
   .caption-phase.game-hunt {
     --stage-h: 22vh;
+  }
+
+  /* touch screens start 12px lower (finger-sized header buttons, app/pwa.css) */
+  @media (pointer: coarse) {
+    .caption-phase.game-hunt {
+      --stage-h: calc(22vh - 12px);
+    }
   }
 
   .caption-phase.game-same {
