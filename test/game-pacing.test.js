@@ -116,7 +116,10 @@ test('pacing: a silent round makes a player away - the others are no longer held
   for (const p of active) await ready(p);
   assert.equal(left(host), 45_000); // last call
   for (const p of players) assert.equal(row(p, dora).away, false);
-  await env.advance(45_000);
+  // her browser flushes the untouched, empty text box right before the end - that is no sign of life
+  await env.advance(43_800);
+  dora.send({ t: 'draft', captions: caption('') });
+  await env.advance(1200);
   // the round ended without any input from Dora
   assert.equal(host.state.phase, 'vote');
   for (const p of players) {
@@ -150,7 +153,8 @@ test('pacing: a silent round makes a player away - the others are no longer held
   await ready(cleo);
   assert.equal(left(host), 1500);
   // Dora comes back: an unchanged draft is no sign of life, a real change is
-  dora.send({ t: 'draft', captions: [] });
+  dora.send({ t: 'draft', captions: caption('') });
+  dora.send({ t: 'draft', captions: caption('') });
   assert.equal(row(host, dora).away, true);
   dora.send({ t: 'draft', captions: caption('I am back') });
   for (const p of players) assert.equal(row(p, dora).away, false);

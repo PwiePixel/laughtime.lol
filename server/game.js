@@ -1660,8 +1660,10 @@ function handleMessage(ws, msg) {
       const sub = cur.subs.get(player.id);
       if (!sub || (sub.submitted && msg.t === 'draft')) return;
       const captions = sanitizeCaptions(msg.captions);
-      // browsers flush drafts by themselves - only a changed draft shows that somebody is there
-      if (msg.t === 'submit' || JSON.stringify(captions) !== JSON.stringify(sub.captions)) touch(room, player);
+      // Browsers flush drafts by themselves (also the untouched, empty text box right before the
+      // time runs out) - only a changed text shows that somebody is there.
+      const changed = (hasText(captions) || hasText(sub.captions)) && JSON.stringify(captions) !== JSON.stringify(sub.captions);
+      if (msg.t === 'submit' || changed) touch(room, player);
       sub.captions = captions;
       if (msg.t === 'submit') {
         if (!sub.media) return send(ws, { t: 'error', code: 'search_first' });
