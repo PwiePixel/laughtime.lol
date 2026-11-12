@@ -286,7 +286,8 @@ button.strip-player {
   transform: scale(0.94);
 }
 
-.beta-chip {
+/* not .beta-chip: that name belongs to the beta page (app/beta.css) and would restyle this tag */
+.mode-beta-chip {
   display: inline-block;
   margin-left: 6px;
   padding: 0 7px;

@@ -53,7 +53,7 @@ export default function GamePicker({ purpose = 'quick', busy = null, onPick, onC
               <span className="game-body">
                 <strong>
                   {t(`games.${g.id}`)}
-                  {g.beta && <span className="beta-chip">{t('games.beta')}</span>}
+                  {g.beta && <span className="mode-beta-chip">{t('games.beta')}</span>}
                 </strong>
                 <span>{t(`games.${g.id}.text`, { n: info.huntSearches })}</span>
                 {purpose === 'quick' && info[g.id]?.players > 0 && (

@@ -279,7 +279,7 @@ function PrivateLobby({ game }) {
                 <span className="gs-text">
                   <strong>
                     {t(`games.${g.id}`)}
-                    {g.beta && <span className="beta-chip">{t('games.beta')}</span>}
+                    {g.beta && <span className="mode-beta-chip">{t('games.beta')}</span>}
                   </strong>
                   <small>{t(`games.${g.id}.text`, { n: searches })}</small>
                 </span>
