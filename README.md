@@ -32,23 +32,73 @@ Alle neuen Einstellungen sind optional und stehen am Ende der `.env.example`. Ei
 
 ## So läuft ein Spiel
 
-Auf der Startseite gibt es zwei große Knöpfe, beide öffnen ein kleines Fenster zur **Spielauswahl** (Klassisch, GIF-Jagd, Tausch-Runde – die Tausch-Runde nur privat):
+Auf der Startseite gibt es zwei große Knöpfe, beide öffnen ein kleines Fenster zur **Spielauswahl** (Klassisch, GIF-Jagd, Tausch-Runde – die Tausch-Runde nur privat; auf dem Beta-Kanal zusätzlich „Eins für alle“):
 
 - **Schnelles Spiel** – öffentliches Matchmaking (`/play?game=classic|hunt`): Zufällige Spieler werden zusammengewürfelt. Während der Suche läuft ein Ladebildschirm mit dem animierten LoL-Logo. Sobald genug Spieler da sind (Standard 4, höchstens 8), zählt ein kurzer Countdown herunter und das Spiel startet von selbst. Öffentliche Räume haben keinen Host: niemand kann Einstellungen ändern, kicken oder überspringen, und nach dem Finale startet automatisch das nächste Spiel. Wer später sucht, wird in offene öffentliche Räume mit freien Plätzen gesetzt.
 - **Privates Spiel** – eigener Raum mit Link / 5-stelligem Code für Freunde.
 
+Jede Runde läuft gleich ab: **Text schreiben → Memes bewerten → Rundenergebnis**, am Ende folgt das **Finale**.
+
 1. Der Host (nur private Räume) wählt Spielmodus, Meme-Pack, Runden, Zeiten und Inhalte (Memes, Clips oder gemischt) und startet.
-2. **Schreibphase:** Alle bekommen eine eigene Vorlage bzw. einen Clip, schreiben Texte und ziehen sie an die richtige Stelle. Mit „Neue Vorlage“ kann man neu würfeln.
-3. **Abstimmung:** Die Memes erscheinen nacheinander ohne Namen. Alle bewerten auf einer Skala von „Naja“ bis „Ich bin tot“; nach jedem Meme werden nur die Punkte gezeigt. **Wer welches Meme gemacht hat, bleibt bis zum Ende der Runde geheim** – auch die Punkte in der Spielerleiste ändern sich erst dann, damit nichts verraten wird. Reaktionen fliegen live über das Bild.
-4. **Rundenergebnis:** „Wer hat was gemacht?“ – die Namen werden nacheinander aufgedeckt, dazu die Rangliste. Am Ende Siegertreppchen und die besten Memes.
+2. **Schreibphase:** Alle schreiben Texte auf ihr Bild bzw. ihren Clip und ziehen sie an die richtige Stelle. Woher das Bild kommt, hängt vom Spielmodus ab.
+3. **Abstimmung:** Die Memes erscheinen nacheinander ohne Namen. Alle bewerten mit 1 bis 5 Punkten („Naja“ bis „Ich bin tot“, am Desktop auch mit den Tasten 1–5). Nach jedem Meme werden die Punkte und die **Verteilung der Stimmen** gezeigt. **Wer welches Meme gemacht hat, bleibt bis zum Ende der Runde geheim** – auch die Punkte in der Spielerleiste ändern sich erst dann, damit nichts verraten wird. Reaktionen fliegen live über das Bild.
+4. **Rundenergebnis:** „Wer hat was gemacht?“ – die Namen werden nacheinander aufgedeckt, dazu die Rangliste. Wer mehrere Runden in Folge gewinnt, bekommt eine Serien-Flamme.
+5. **Finale:** Das Podest steigt von Platz 3 bis 1 auf, danach folgen die besten Memes und (ab drei Mitspielern) bis zu vier Auszeichnungen.
+
+Die Punkte eines Memes sind immer die Summe aller Bewertungen. Auf dem Handy sitzt die wichtigste Aktion (Fertig, Starten, Nochmal spielen) zusammen mit Uhr und Fortschritt in einer Leiste am unteren Rand und bleibt auch über der Bildschirmtastatur erreichbar. Die Spielerleiste zeigt live, wer sucht, wer fertig ist und wer abwesend ist – wer schon abgestimmt hat, wird nie pro Spieler angezeigt, nur die Anzahl der Stimmen.
+
+### Spielmodus „Klassisch“
+
+Alle bekommen eine zufällige Meme-Vorlage oder einen Clip und schreiben den lustigsten Text dazu. Mit „Neue Vorlage“ kann neu gewürfelt werden (Anzahl pro Runde einstellbar), der getippte Text bleibt erhalten. Öffentlich und privat spielbar.
+
+**In v2 unverändert:** Regeln, Phasen, Zeiten, Punkte, Einstellungen, Standardwerte und Anonymität – ein automatischer Test (`test/game-classic.test.js`) spielt ein komplettes Spiel durch und hält genau das fest. Neu ist nur die Darstellung, die alle Modi bekommen haben (Stimmenverteilung, Serien-Flamme, Auszeichnungen, Aktionsleiste auf dem Handy).
 
 ### Spielmodus „GIF-Jagd“
 
-Niemand bekommt eine Vorlage zugeteilt – jeder gibt selbst einen Suchbegriff ein (z. B. „wütende Katze“) und bekommt ein **zufälliges** GIF aus den Treffern. Pro Runde gibt es nur **2 Suchen** (`HUNT_SEARCHES`); eine Suche ohne Treffer kostet nichts. „Überrasch mich“ liefert ein zufälliges GIF (zählt als Suche). Der bereits geschriebene Text bleibt bei einer neuen Suche erhalten. Beim Abstimmen wird der Suchbegriff unter dem Meme angezeigt. Gesucht wird bei Imgflip (GIF-Vorlagen, ohne Schlüssel), GIPHY und KLIPY (mit Schlüssel); über „Inhalte“ lässt sich auch auf Bilder oder gemischt umstellen. Gesperrte Wörter (`BLOCKED_WORDS`) werden abgelehnt.
+Niemand bekommt eine Vorlage zugeteilt – jeder sucht sich sein GIF selbst.
+
+- Suchwort eintippen (z. B. „wütende Katze“) oder einen der drei **Ideen-Chips** der Runde antippen. **Jede Suche bringt vier GIFs**, das erste ist vorausgewählt.
+- Frühere Funde bleiben in der eigenen **Ablage**. Bis zum Abschicken kann beliebig gewechselt werden, der Text bleibt dabei stehen.
+- Einmal pro Runde gibt es den **Glücksgriff**: vier zufällige GIFs, kostet keine Suche.
+- Eine Suche ohne Treffer kostet nichts.
+- Suchen pro Runde: in privaten Räumen 1 bis 4 oder „Standard“; öffentliche Räume nutzen immer den Server-Standard (`HUNT_SEARCHES`, Voreinstellung 2).
+- Das Suchwort bleibt beim Bewerten verdeckt und wird erst mit dem Ergebnis des Memes eingeblendet.
+- Gesucht wird bei Imgflip (GIF-Vorlagen, ohne Schlüssel), GIPHY und KLIPY (mit Schlüssel); über „Inhalte“ lässt sich auch auf Bilder oder gemischt umstellen. Gesperrte Wörter (`BLOCKED_WORDS`) werden abgelehnt. Gleiche Suchen werden zwischengespeichert und belasten die Anbieter nicht erneut.
+- Öffentlich und privat spielbar.
 
 ### Spielmodus „Tausch-Runde“ (nur private Räume)
 
-Jede Runde beginnt mit einer **Bildphase** (Zeit einstellbar, Standard 60 s): Jeder lädt ein eigenes Bild oder GIF hoch (PNG, JPG, GIF, WebP, max. 8 MB – per Auswählen, Ziehen oder Einfügen), sucht sich eins aus unseren GIFs/Vorlagen aus oder nimmt „Überrasch mich“. Wer nichts wählt, bekommt automatisch eine Vorlage. Danach werden die Bilder im Kreis getauscht – **niemand bekommt sein eigenes** – und alle schreiben ihren Text wie gewohnt. Von wem das Bild stammt („Bild von …“), wird erst im Rundenergebnis gezeigt. Hochgeladene Bilder liegen nur in `data/uploads/rooms/`, sind nur für die Spieler im Raum sichtbar, landen nie in der Galerie und werden gelöscht, sobald ein neues Spiel startet oder der Raum geschlossen wird (spätestens nach 6 Stunden). Upload-Anfragen werden über Spieler-ID + Geheimnis geprüft und pro IP begrenzt.
+- **Mitbringen** (Zeit einstellbar, Standard 60 s): Jeder bringt ein Bild oder GIF mit – hochladen (PNG, JPG, GIF, WebP, max. 8 MB – per Auswählen, Ziehen oder Einfügen), suchen (höchstens 6 Suchen pro Runde) oder „Überraschung“. Die Auswahl lässt sich ändern, solange die Phase läuft. Wer nichts wählt, bekommt automatisch eine Vorlage. Sind alle fertig, wird nach 2,5 Sekunden getauscht.
+- **Auswählen und beschriften:** Jeder bekommt **zwei Bilder von anderen Spielern** (nie das eigene), wählt eins und schreibt den Text dazu. Zu zweit gibt es nur ein Bild.
+- **Bild-Bonus:** Wer ein eigenes Bild hochgeladen oder gesucht hat, bekommt **+1 Punkt für jede 4 oder 5**, die ein Meme mit diesem Bild erhält. Die eigene Stimme zählt dabei nicht, Überraschungsbilder bringen keinen Bonus.
+- Von wem ein Bild stammt, wird erst im Rundenergebnis gezeigt. Wird dasselbe Bild zweimal beschriftet, laufen beide Memes direkt hintereinander („Gleiches Bild, zweiter Versuch“). Bilder, die niemand genommen hat, erscheinen im Rundenergebnis unter „Liegen geblieben“.
+- Am besten ab 3 Spielern – zu zweit gibt es keine Auswahl und keinen Bild-Bonus.
+
+Hochgeladene Bilder liegen nur in `data/uploads/rooms/`, sind nur für die Spieler im Raum sichtbar, landen nie in der Galerie und werden gelöscht, sobald ein neues Spiel startet oder der Raum geschlossen wird (spätestens nach 6 Stunden). Upload-Anfragen werden über Spieler-ID + Geheimnis geprüft und pro IP begrenzt.
+
+### Spielmodus „Eins für alle“ (Beta, nur private Räume)
+
+Alle beschriften in jeder Runde **dasselbe Bild**. Es gibt keinen Vorlagenwechsel; eigene Meme-Packs funktionieren. Ablauf und Wertung wie Klassisch, Standard-Schreibzeit 60 Sekunden. Der Modus ist nur auf dem Beta-Kanal sichtbar und erstellbar (siehe [docs/beta.md](docs/beta.md)), nicht im Schnellspiel und nicht in der Discord-Activity.
+
+### Tempo-Regeln (GIF-Jagd, Tausch-Runde, Eins für alle – nicht Klassisch)
+
+- **Letzte Chance:** Sind fast alle fertig (ab 3 Spielern), wird die Zeit für die Letzten verkürzt – beim Schreiben und Mitbringen nie unter die Hälfte der eingestellten Zeit, beim Bewerten auf 4 Sekunden.
+- **Abwesend:** Wer eine ganze Runde nichts tut oder zwei Abstimmungen verpasst, bekommt ein Mond-Symbol, und die Runde wartet nicht mehr auf ihn. Jede Eingabe hebt das sofort wieder auf.
+- **Gleichstand:** Bei gleicher Punktzahl entscheiden zuerst die gewonnenen Runden, dann das beste einzelne Meme. (Klassisch: Gleichstand bleibt wie bisher ein Unentschieden.)
+- **Später einsteigen:** In GIF-Jagd und Tausch-Runde spielt man mit, wenn noch mindestens 30 Sekunden Schreibzeit übrig sind (Klassisch und Eins für alle: 15 Sekunden). Sonst schaut man die Runde zu und stimmt mit ab.
+
+### Auszeichnungen im Finale
+
+Ab drei Mitspielern gibt es bis zu vier Auszeichnungen. Sie bringen keine Punkte.
+
+| Auszeichnung | Wofür | Modus |
+| --- | --- | --- |
+| Meme des Spiels | bestes einzelnes Meme | alle |
+| On Fire | längste Serie gewonnener Runden | alle |
+| Publikumsliebling | meiste Reaktionen auf die eigenen Memes | alle |
+| Dauerbrenner | bester Durchschnitt | alle |
+| Bester Lieferant | meister Bild-Bonus | Tausch-Runde |
+| Volltreffer | bestes Meme mit nur einer Suche | GIF-Jagd |
 
 ### Streamer-Modus
 
