@@ -72,6 +72,7 @@ const SHARED_SWAPS_MAX = 2; // "same": how often a broken shared picture is repl
 const LAST_CALL_MS = { upload: 15000, caption: 20000, vote: 4000 };
 const AWAY_MISSED_VOTES = 2; // paced modes: missed votes in a row until a player counts as away
 const CROWD_MAX_PER_ITEM = 5; // reactions per reactor and meme that count for the crowd award
+const REPORTS_PER_SOCKET = { max: 8, windowMs: 10 * 60 * 1000 }; // the same numbers moderation.js uses per reporter
 const DIST_IN_CLASSIC = true; // show the anonymous vote distribution in classic too (presentation only)
 
 const rooms = new Map();
@@ -1667,6 +1668,12 @@ function handleReport(ws, room, player, msg) {
     target = room.players.get(String(msg.pid)) || null;
   }
   if (!target) return send(ws, { t: 'error', code: 'report_gone' });
+  // The limit in moderation.js counts per reporter id. A connection that keeps changing its id
+  // would start at zero every time, so the connection is counted as well.
+  const t = now();
+  ws.reportTimes = (ws.reportTimes || []).filter((at) => t - at < REPORTS_PER_SOCKET.windowMs);
+  if (ws.reportTimes.length >= REPORTS_PER_SOCKET.max) return send(ws, { t: 'error', code: 'too_many_reports' });
+  ws.reportTimes.push(t);
   createReport({
     reporter: { userId: player.userId, pid: player.id, ipHash: player.ipHash, name: player.name },
     target: { userId: target.userId, pid: target.id, ipHash: target.ipHash, name: target.name, avatar: target.avatar },

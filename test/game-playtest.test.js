@@ -297,3 +297,26 @@ for (const mode of ['same', 'swap']) {
     assert.equal(ann.state.phase, phase);
   });
 }
+
+test('the report limit holds for a connection that keeps changing its id', async () => {
+  const { host, code } = await env.room(2, { game: 'classic' });
+  const before = env.db.all('SELECT id FROM reports WHERE target_pid = ?', host.pid).length;
+  const sock = env.client({ name: 'Sock' }).open();
+  let stored = 0;
+  let refused = 0;
+  for (let i = 0; i < 20; i++) {
+    sock.send({ t: 'hello', code, pid: `reporter-${String(i).padStart(3, '0')}`, secret: 'secret-of-a-reporter-0123456789', name: `R${i}`, avatar: 'cat|1' });
+    sock.send({ t: 'report', pid: host.pid, reason: 'name' });
+    await flush(20);
+    stored += sock.take('reported').length;
+    refused += sock.errors().filter((c) => c === 'too_many_reports').length;
+  }
+  assert.equal(stored, 8);
+  assert.equal(refused, 12);
+  assert.equal(env.db.all('SELECT id FROM reports WHERE target_pid = ?', host.pid).length - before, 8);
+  // ten minutes later the connection may report again
+  await env.advance(10 * 60 * 1000);
+  sock.send({ t: 'report', pid: host.pid, reason: 'spam' });
+  await flush(20);
+  assert.equal(sock.take('reported').length, 1);
+});
