@@ -57,6 +57,7 @@ const PUBLIC_START_MS = 12 * 1000; // public room: wait this long for matched pl
 const PUBLIC_ALL_HERE_MS = 3500; // …or start soon once everybody arrived
 const PUBLIC_RESTART_MS = 20 * 1000; // public room: next game starts automatically
 const RESERVE_MS = 25 * 1000; // a matched player's seat is kept this long
+const SPARE_SEATS = 32; // seats of players who dropped out that a room keeps on top of its size
 const HUNT_MAX_ATTEMPTS = 12; // searches per player per round (incl. ones without results)
 const HUNT_HAND = 4; // tiles dealt by one search
 const HUNT_HAND_TOP = 16; // …out of this many best hits
@@ -1363,6 +1364,13 @@ function checkPublicStart(room) {
 
 // --- connection handling ----------------------------------------------------
 
+/** a seat nobody sits on and that has no part in the game: no points, no round played, nothing in the running round */
+function idleSeat(room, p) {
+  if (p.connected || p.score > 0 || p.id === room.hostId || room.tally.get(p.id)?.rounds) return false;
+  const cur = room.current;
+  return !(cur?.subs.has(p.id) || cur?.contribs.has(p.id));
+}
+
 function handleHello(ws, msg) {
   const code = String(msg.code || '').toUpperCase();
   const room = rooms.get(code);
@@ -1393,6 +1401,12 @@ function handleHello(ws, msg) {
   if (player) {
     if (!safeEqual(player.secret, secret)) return send(ws, { t: 'error', code: 'bad_request' });
   } else {
+    // Who drops out of a running game keeps the seat until it is over (points and memes count).
+    // Seats that never took part are given up first once there are far too many - a client that
+    // keeps saying hello under new ids must not be able to grow a room without end.
+    const limit = room.settings.maxPlayers + SPARE_SEATS;
+    if (room.players.size >= limit) for (const p of [...room.players.values()]) if (idleSeat(room, p)) room.players.delete(p.id);
+    if (room.players.size >= limit) return send(ws, { t: 'error', code: 'room_full' });
     const seats = room.settings.maxPlayers - (room.reserved.has(pid) ? 0 : openReservations(room));
     if (connectedPlayers(room).length >= seats) return send(ws, { t: 'error', code: 'room_full' });
     player = {

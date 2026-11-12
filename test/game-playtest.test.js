@@ -96,3 +96,36 @@ test('pacing: skipping the caption phase makes nobody away - only a clock that r
   assert.equal(ann.state.phase, 'vote');
   assert.deepEqual(ann.state.players.map((p) => p.away), [false, false, true]);
 });
+
+test('a client that keeps saying hello under new ids cannot grow a room without end', async () => {
+  const { players, host, code } = await env.room(3, { game: 'classic', settings: { rounds: 2 } });
+  const [ann, ben, eve] = players;
+  await env.start(host);
+  for (const p of players) p.send({ t: 'submit', captions: caption(p.name) });
+  await env.advance(1500);
+  while (ann.state.phase === 'vote') {
+    await rate(players, 5);
+    await env.advance(3500);
+  }
+  assert.equal(ann.state.phase, 'scores');
+  assert.ok(ann.state.players.find((p) => p.id === ben.pid).score > 0);
+  // Ben loses the connection for good: his seat and his points stay until the game is over
+  ben.drop();
+  const limit = ann.state.settings.maxPlayers + 32;
+  for (let i = 0; i < 400; i++) {
+    eve.send({ t: 'hello', code, pid: `stranger-${String(i).padStart(4, '0')}`, secret: 'secret-of-a-stranger-0123456789', name: `S${i}`, avatar: 'cat|1' });
+    assert.ok(ann.state.players.length <= limit, `${ann.state.players.length} seats after ${i + 1} hellos`);
+  }
+  assert.ok(JSON.stringify(ann.wire).length < 16_000, 'the state stays small');
+  const seats = ann.state.players;
+  assert.ok(seats.find((p) => p.id === ben.pid).score > 0, 'a seat with points is never given up');
+  assert.equal(seats.find((p) => p.id === eve.pid).connected, false);
+  assert.ok(seats.find((p) => p.id === eve.pid).score > 0);
+  // real players still get in, and come back to the seat they had
+  const dan = env.client({ name: 'Dan' }).join(code);
+  assert.deepEqual(dan.errors(), []);
+  assert.equal(dan.me().connected, true);
+  ben.join(code);
+  assert.deepEqual(ben.errors(), []);
+  assert.ok(ben.me().score > 0);
+});
