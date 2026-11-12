@@ -37,17 +37,23 @@ export function drawHand(items, { own = new Set(), avoid = new Set(), size = 4, 
  * Returns Map receiver -> [owner ids] with up to `options` entries: never the
  * receiver's own picture, never the same owner twice. If all n >= 3 seats own a
  * picture, every picture is offered to exactly `options` receivers.
+ * `pictureOf(owner)` names the picture somebody brought. When two players
+ * brought the very same one, a receiver gets it once at most - and never as a
+ * copy of the picture they brought themselves; the walk goes on to the next owner.
  */
-export function dealSwap({ receivers, owners, options = 2, shuffle = keep }) {
+export function dealSwap({ receivers, owners, options = 2, shuffle = keep, pictureOf = (owner) => owner }) {
   const owning = new Set(owners);
   const ring = shuffle([...new Set([...receivers, ...owners])]);
   const seat = new Map(ring.map((id, i) => [id, i]));
   const deal = new Map();
   for (const pid of new Set(receivers)) {
     const got = [];
+    const seen = new Set(owning.has(pid) ? [pictureOf(pid)] : []);
     for (let step = 1; step < ring.length && got.length < options; step++) {
       const other = ring[(seat.get(pid) + step) % ring.length];
-      if (owning.has(other)) got.push(other);
+      if (!owning.has(other) || seen.has(pictureOf(other))) continue;
+      seen.add(pictureOf(other));
+      got.push(other);
     }
     deal.set(pid, got);
   }

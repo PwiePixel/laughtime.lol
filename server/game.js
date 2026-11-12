@@ -956,7 +956,7 @@ function swapHand(room, player, ownerIds, { allowOwn = true } = {}) {
   const hand = [];
   for (const id of ownerIds) {
     const c = cur.contribs.get(id);
-    // two players brought the very same GIF: seeing it twice would not be a choice
+    // two players brought the very same GIF: seeing it twice would not be a choice (late joiners; the deal avoids it itself)
     if (!c || hand.some((option) => option.media.id === c.media.id)) continue;
     cur.offers.set(id, (cur.offers.get(id) || 0) + 1);
     hand.push({ media: c.media, from: id });
@@ -980,7 +980,8 @@ function endUpload(room) {
   // Everybody gets the pictures of two other players and never their own. Who brought
   // nothing simply has no picture in the deal; pictures of players who are offline
   // right now stay in the game.
-  const deal = dealSwap({ receivers: receivers.map((p) => p.id), owners: swapOwners(room), options: SWAP_OPTIONS, shuffle });
+  const pictureOf = (owner) => cur.contribs.get(owner).media.id;
+  const deal = dealSwap({ receivers: receivers.map((p) => p.id), owners: swapOwners(room), options: SWAP_OPTIONS, shuffle, pictureOf });
   for (const p of receivers) addToRound(room, p, swapHand(room, p, deal.get(p.id) || []));
   for (const p of room.players.values()) p.swapResults = null;
   cur.endingSoon = false;

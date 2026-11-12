@@ -196,10 +196,11 @@ test('swap: two players who brought the same GIF do not fill a hand with it twic
   }
   await env.advance(2500);
   assert.equal(host.state.phase, 'caption');
-  for (const p of players) {
+  for (const [i, p] of players.entries()) {
     const ids = p.state.caption.hand.map((tile) => tile.media.id);
     assert.equal(new Set(ids).size, ids.length, `${p.name} got ${ids.join(' + ')}`);
     assert.ok(ids.length >= 1 && ids.length <= 2);
+    assert.ok(!ids.includes(brought[i]), `${p.name} got a copy of the picture they brought`);
     assert.equal(p.state.caption.media.id, ids[0]);
   }
   // the round plays through as usual

@@ -96,6 +96,27 @@ test('dealSwap: never the own picture, no owner twice, two offers per picture', 
   assert.deepEqual(dealSwap({ receivers: ['a', 'b'], owners: ['a', 'b'] }), new Map([['a', ['b']], ['b', ['a']]]));
 });
 
+test('dealSwap: the same picture brought twice is offered once, never as a copy of the own one', () => {
+  // a and b brought the same GIF, everybody else something of their own
+  const players = ['a', 'b', 'c', 'd', 'e', 'f'];
+  const pictureOf = (owner) => (owner === 'b' ? 'picture of a' : `picture of ${owner}`);
+  for (let seed = 1; seed <= 50; seed++) {
+    const deal = dealSwap({ receivers: players, owners: players, shuffle: seeded(seed), pictureOf });
+    for (const [receiver, got] of deal) {
+      const pictures = got.map(pictureOf);
+      assert.equal(got.length, 2, 'enough other pictures are there: still two to choose from');
+      assert.equal(new Set(pictures).size, 2, 'the same picture twice');
+      assert.ok(!pictures.includes(pictureOf(receiver)), 'a copy of the own picture');
+    }
+  }
+  // everybody brought the same one: nothing to pass on (the game falls back to the own picture)
+  const same = dealSwap({ receivers: ['a', 'b', 'c'], owners: ['a', 'b', 'c'], pictureOf: () => 'x' });
+  assert.deepEqual([...same.values()], [[], [], []]);
+  // somebody who brought nothing gets it once
+  const one = dealSwap({ receivers: ['a', 'b', 'c'], owners: ['a', 'b'], pictureOf: () => 'x' });
+  assert.equal(one.get('c').length, 1);
+});
+
 test('dealSwap: offline bringers stay in, receivers without a picture still get two', () => {
   // d brought a picture but is offline: no receiver seat, picture in the game
   const withOffline = dealSwap({ receivers: ['a', 'b', 'c'], owners: ['a', 'b', 'c', 'd'] });
