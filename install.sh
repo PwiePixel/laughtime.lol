@@ -172,6 +172,8 @@ on_exit() {
   exit "$rc"
 }
 
+# main creates the folder up front: a subshell that made its own would leave
+# it behind, because only the main shell cleans up
 tmp_dir() {
   if [[ -z "$TMP_DIR" ]]; then TMP_DIR=$(mktemp -d "${TMPDIR:-/tmp}/laughtime-install.XXXXXX"); fi
 }
@@ -657,10 +659,23 @@ resolve_manager() {
   fi
 }
 
-node_ok() {
-  have node || return 1
-  node -e 'const [a, b] = process.versions.node.split(".").map(Number); process.exit(a > 22 || (a === 22 && b >= 13) ? 0 : 1)' 2>/dev/null || return 1
-  node -e 'require("node:sqlite")' >/dev/null 2>&1
+node_ok() {   # [binary]
+  local bin=${1:-node}
+  have "$bin" || return 1
+  "$bin" -e 'const [a, b] = process.versions.node.split(".").map(Number); process.exit(a > 22 || (a === 22 && b >= 13) ? 0 : 1)' 2>/dev/null || return 1
+  "$bin" -e 'require("node:sqlite")' >/dev/null 2>&1
+}
+
+# a new Node.js is useless while an old one comes first on the PATH (nvm,
+# leftovers in /usr/local): put the folder of the good one in front
+prefer_good_node() {
+  local dir
+  hash -r
+  node_ok node && return 0
+  for dir in "$(dst /usr/local)/bin" /usr/local/bin /usr/bin; do
+    if node_ok "$dir/node"; then PATH="$dir:$PATH"; hash -r; return 0; fi
+  done
+  return 1
 }
 
 mem_available_mb() {
@@ -823,7 +838,7 @@ install_node_nodesource() {   # <major>
 
 # official build from nodejs.org into /usr/local, checksum verified
 install_node_tarball() {
-  local node_arch line sums file sum target
+  local node_arch line sums file sum target top
   case "$ARCH" in
     amd64) node_arch='x64' ;;
     arm64) node_arch='arm64' ;;
@@ -848,8 +863,10 @@ install_node_tarball() {
     ok "Checksum verified (sha256 ${sum:0:16}…)"
     target=$(dst /usr/local)
     quiet as_root mkdir -p "$target"
+    # only the program folders – the README and changelog of the archive do not belong into /usr/local
+    top=${file%.tar.gz}
     run_logged "Unpacking Node.js into $target" as_root tar -xzf "$TMP_DIR/$file" -C "$target" --strip-components=1 --no-same-owner \
-      --exclude='*/CHANGELOG.md' --exclude='*/README.md' --exclude='*/LICENSE' || return 1
+      "$top/bin" "$top/include" "$top/lib" "$top/share" || return 1
     rm -f -- "$TMP_DIR/$file"
     case ":$PATH:" in *":$target/bin:"*) ;; *) PATH="$target/bin:$PATH" ;; esac
     return 0
@@ -862,8 +879,8 @@ install_node() {
   case "$PKG" in
     apt|dnf)
       for line in "${NODE_LINES[@]}"; do
-        if install_node_nodesource "$line"; then hash -r; node_ok && return 0; fi
-        note "NodeSource did not deliver a usable Node.js $line."
+        if install_node_nodesource "$line" && prefer_good_node; then return 0; fi
+        [[ -n "$ROOT_PREFIX" ]] || note "NodeSource did not deliver a usable Node.js $line."
       done
       ;;
     # these distributions ship current Node.js releases themselves
@@ -871,17 +888,15 @@ install_node() {
     zypper) pkg_install nodejs22 npm22 || pkg_install nodejs npm || true ;;
     apk)    pkg_install nodejs npm libstdc++ || true ;;
   esac
-  hash -r
-  if node_ok && have npm; then return 0; fi
+  if prefer_good_node && have npm; then return 0; fi
   note 'Falling back to the official build from nodejs.org.'
   install_node_tarball || return 1
-  hash -r
-  node_ok
+  prefer_good_node
 }
 
 step_node() {
   step 'Node.js'
-  if node_ok && have npm; then
+  if node_ok node && have npm; then
     ok "Node.js $(node -v) is installed and has the built-in SQLite"
   else
     if have node; then
@@ -1085,13 +1100,13 @@ step_app() {
     ok 'npm packages are up to date'
   else
     if [[ -f "$APP_DIR/package-lock.json" ]]; then
-      if ! (cd "$APP_DIR" && run_logged 'npm ci (exact versions from package-lock.json)' npm_app ci --no-audit --no-fund --loglevel=error); then
+      if ! run_logged 'npm ci (exact versions from package-lock.json)' npm_app ci --no-audit --no-fund --loglevel=error; then
         note 'npm ci did not work – trying npm install instead.'
-        (cd "$APP_DIR" && run_logged 'npm install' npm_app install --no-audit --no-fund --loglevel=error) \
+        run_logged 'npm install' npm_app install --no-audit --no-fund --loglevel=error \
           || die 'Installing the npm packages failed. Check the network connection and the lines above, then run the script again.'
       fi
     else
-      (cd "$APP_DIR" && run_logged 'npm install' npm_app install --no-audit --no-fund --loglevel=error) \
+      run_logged 'npm install' npm_app install --no-audit --no-fund --loglevel=error \
         || die 'Installing the npm packages failed. Check the network connection and the lines above, then run the script again.'
     fi
     if (( ! DRY_RUN )); then
@@ -1110,7 +1125,7 @@ step_app() {
   fi
 
   before=$(cat "$APP_DIR/.next/BUILD_ID" 2>/dev/null || true)
-  (cd "$APP_DIR" && run_logged 'Production build (node index.js --build-only)' build_app) \
+  run_logged 'Production build (node index.js --build-only)' build_app \
     || die 'The production build failed. With little memory, run the script again and allow the temporary swap file.'
   after=$(cat "$APP_DIR/.next/BUILD_ID" 2>/dev/null || true)
   [[ "$before" == "$after" ]] || BUILD_CHANGED=1
@@ -1981,6 +1996,7 @@ main() {
   (( ! WANT_TUNNEL )) || STEP_TOTAL=$((STEP_TOTAL + 1))
 
   start_log
+  if (( ! DRY_RUN )); then tmp_dir; fi
   step_system
   step_packages
   if [[ "$MODE" == update ]]; then step_update_source; fi
