@@ -7,6 +7,7 @@ import { api } from '@/lib/api';
 import Avatar from './Avatar';
 import Icon from './Icon';
 import { useApp } from './Providers';
+import NewsDot from './news/NewsDot';
 import BetaBadge from './v2/BetaBadge';
 
 function AccountMenu({ inActivity = false }) {
@@ -110,6 +111,8 @@ export default function Header({ activityView = null }) {
     { href: '/memes', label: t('nav.memes'), icon: 'trophy', view: 'memes' },
     { href: '/leaderboard', label: t('nav.leaderboard'), icon: 'podium', view: 'leaderboard' },
   ];
+  // the news area is part of the website only (the activity maps its own views)
+  if (!inActivity) links.push({ href: '/news', label: t('nav.news'), icon: 'sparkles', view: 'news', dot: true });
   const isActive = (l) => (inActivity ? activityView === l.view : l.href === '/' ? pathname === '/' : pathname.startsWith(l.href));
   return (
     <header className={`header ${inActivity ? 'in-activity' : ''}`}>
@@ -127,6 +130,7 @@ export default function Header({ activityView = null }) {
             <Link key={l.href} href={l.href} className={active ? 'active' : ''} aria-current={active ? 'page' : undefined}>
               <Icon name={l.icon} size={18} />
               <span>{l.label}</span>
+              {l.dot && <NewsDot />}
             </Link>
           );
         })}

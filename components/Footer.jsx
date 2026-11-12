@@ -41,6 +41,7 @@ export default function Footer() {
           ))}
         </span>
       )}
+      <Link href="/news">{t('nav.news')}</Link>
       <Link href="/legal">{t('nav.legal')}</Link>
     </footer>
   );
