@@ -18,11 +18,11 @@ const REPLAY_WINDOW_MS = 8000;
 // the winner steps up last (podium: third, second, first)
 const WINNER_AT_MS = 1500;
 
-function NextGame({ state, serverNow }) {
+function NextGame({ state, serverNow, head = false }) {
   const { t } = useApp();
   const secs = useSecondsLeft(state.deadline, serverNow);
   return (
-    <p className="next-game" role="timer">
+    <p className={`next-game ${head ? 'next-game-head' : ''}`} role="timer">
       <span className="spinner small" aria-hidden="true" /> {t('public.nextGame', { n: secs })}
     </p>
   );
@@ -80,6 +80,8 @@ export default function FinalPhase({ game }) {
         <p className="winner-line" role="status">
           {winnerLine}
         </p>
+        {/* phones: the note further down sits behind the bar, so public rooms say it up here */}
+        {state.isPublic && state.deadline > 0 && <NextGame state={state} serverNow={serverNow} head />}
       </div>
 
       <div className="podium">
