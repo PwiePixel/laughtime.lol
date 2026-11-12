@@ -1898,18 +1898,10 @@ button.strip-player {
   }
 }
 
-/* low frames (Discord Activity tile, landscape phones): keep meme and controls on one screen */
+/* low, wide frames (Discord Activity window, landscape phones): meme and controls side by side */
 @media (max-height: 620px) and (min-width: 721px) {
-  .caption-phase {
-    --stage-h: max(200px, 100vh - 250px);
-  }
-
-  .vote-phase {
-    --stage-h: max(180px, 100vh - 420px);
-  }
-
-  .vote-dock {
-    min-height: 230px;
+  body:has(.room.is-playing) .main-nav {
+    display: none;
   }
 
   .phase-head {
@@ -1918,6 +1910,48 @@ button.strip-player {
 
   .player-strip {
     margin-bottom: 8px;
+    padding-top: 4px;
+    padding-bottom: 4px;
+  }
+
+  .strip-meta {
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .caption-phase {
+    --stage-h: max(200px, 100vh - 240px);
+  }
+
+  .caption-phase .editor {
+    grid-template-columns: minmax(0, 1.2fr) minmax(280px, 1fr);
+    gap: 16px;
+  }
+
+  .vote-phase {
+    --stage-h: max(170px, 100vh - 290px);
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(300px, 1fr);
+    align-items: start;
+    gap: 0 20px;
+  }
+
+  .vote-phase .phase-head {
+    grid-column: 1 / -1;
+  }
+
+  .vote-dock {
+    margin-top: 0;
+  }
+
+  .reveal {
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: center;
+  }
+
+  .scores-phase {
+    --result-h: min(200px, 100vh - 330px);
   }
 }
 
