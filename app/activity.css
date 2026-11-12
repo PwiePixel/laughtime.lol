@@ -1,1 +1,686 @@
-/* LaughTime v2 – activity */
+/* ------------------------------------------------------------------
+   LaughTime v2 – Discord Activity
+   Layout of the game inside Discord's frame: compact header, start
+   screen, the small picture-in-picture tile, phones (safe areas,
+   keyboard, touch targets) and the page shown outside of Discord.
+   The base rules live in modes.css ("Discord Activity"); colours and
+   motion come from the tokens in globals.css and v2.css.
+   ------------------------------------------------------------------ */
+
+/* --- the frame ------------------------------------------------------ */
+
+/* one scrollbar only: the page scrolls, nothing inside it does */
+html:has(.activity-shell) {
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.28) transparent;
+}
+
+.activity-shell {
+  min-width: 0;
+}
+
+.activity-full {
+  min-width: 0;
+}
+
+body:has(.activity-shell) .footer {
+  padding-bottom: calc(10px + var(--saib));
+}
+
+/* --- compact header ---------------------------------------------------- */
+
+.header.in-activity {
+  gap: 8px 12px;
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
+.header.in-activity .brand-mark {
+  width: 48px;
+}
+
+.header.in-activity .brand-text {
+  font-size: 1.1rem;
+}
+
+/* inside Discord the Discord account is the login: no "Log in" while it loads */
+.header.in-activity .login-btn {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  /* the logo alone says it in a narrow frame */
+  .header.in-activity .brand-text {
+    display: none;
+  }
+
+  .header.in-activity .account-name {
+    display: none;
+  }
+}
+
+/* phones: one row – logo, the three views as icons, language, account */
+@media (max-width: 520px) {
+  .header.in-activity {
+    flex-wrap: nowrap;
+    gap: 6px;
+  }
+
+  .header.in-activity .brand-mark {
+    width: 40px;
+  }
+
+  .header.in-activity .main-nav {
+    order: 0;
+    width: auto;
+    flex: 0 1 auto;
+    padding: 3px;
+    border-radius: 999px;
+  }
+
+  .header.in-activity .main-nav a {
+    flex: none;
+    width: 42px;
+    min-height: 40px;
+    padding: 0;
+    border-radius: 999px;
+  }
+
+  /* the label stays for screen readers */
+  .header.in-activity .main-nav a span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .header.in-activity .header-right {
+    gap: 6px;
+  }
+
+  .header.in-activity .brand,
+  .header.in-activity .header-right {
+    flex: none;
+  }
+}
+
+/* the narrowest phones: every pixel of the row counts */
+@media (max-width: 400px) {
+  .header.in-activity .account-trigger {
+    padding: 3px;
+  }
+
+  .header.in-activity .account-trigger > svg {
+    display: none;
+  }
+}
+
+@media (max-width: 374px) {
+  .header.in-activity .brand-mark {
+    width: 36px;
+  }
+
+  .header.in-activity .main-nav a {
+    width: 40px;
+  }
+
+  .header.in-activity .lang-switch button {
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+}
+
+/* too narrow for one row: the views move below, as on the website */
+@media (max-width: 340px) {
+  .header.in-activity {
+    flex-wrap: wrap;
+  }
+
+  .header.in-activity .main-nav {
+    order: 3;
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .header.in-activity .main-nav a {
+    flex: 1;
+    width: auto;
+  }
+}
+
+@media (max-height: 480px) {
+  .header.in-activity {
+    padding-top: 4px;
+    padding-bottom: 4px;
+  }
+}
+
+/* --- the game in a narrow frame ------------------------------------------------ */
+
+/* one column: a long name is shortened instead of pushing the lobby out of the frame */
+@media (max-width: 960px) {
+  .activity-shell .lobby,
+  .activity-shell .lobby-main,
+  .activity-shell .lobby-side,
+  .activity-shell .player-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* --- who of the call is here --------------------------------------------- */
+
+.activity-people {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  min-height: 32px;
+  margin: 0 0 8px;
+  color: var(--muted-on-dark);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.activity-people-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.activity-people-label svg {
+  color: #8f98ff;
+}
+
+.activity-people ul {
+  display: flex;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.activity-person {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  margin-left: -8px;
+  overflow: hidden;
+  border: 2px solid var(--ink);
+  border-radius: 50%;
+  background: var(--bg-2);
+  color: var(--white);
+  font-size: 0.8rem;
+  font-weight: 700;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.16);
+}
+
+.activity-person:first-child {
+  margin-left: 0;
+}
+
+.activity-person img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.activity-person.is-more {
+  background: var(--yellow);
+  color: var(--ink);
+}
+
+/* --- start screen ---------------------------------------------------------- */
+
+.activity-boot {
+  gap: 10px;
+  padding: 3vh 0 20px;
+}
+
+.activity-boot .mm-visual {
+  width: min(300px, 62vw, 44vh);
+}
+
+.activity-boot-title {
+  flex-wrap: wrap;
+  justify-content: center;
+  font-size: clamp(1.3rem, 4.6vw, 2rem);
+  text-align: center;
+}
+
+.activity-steps {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.activity-steps li {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 14px 5px 5px;
+  border: 2px solid var(--glass-border);
+  border-radius: 999px;
+  background: var(--glass-bg);
+  color: var(--muted-on-dark);
+  font-size: 0.9rem;
+  font-weight: 700;
+  transition:
+    background-color var(--dur) var(--ease-out),
+    color var(--dur) var(--ease-out),
+    transform var(--dur) var(--ease-spring);
+}
+
+.activity-step-dot {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+  font-size: 0.8rem;
+  line-height: 1;
+}
+
+.activity-steps li.is-active {
+  border-color: var(--ink);
+  background: var(--yellow);
+  color: var(--ink);
+  box-shadow: 0 3px 0 var(--ink);
+  transform: translateY(-2px);
+}
+
+.activity-steps li.is-done {
+  color: var(--green);
+}
+
+.activity-steps li.is-done .activity-step-dot {
+  border-color: var(--ink);
+  background: var(--green);
+  color: var(--ink);
+}
+
+.activity-boot-note {
+  min-height: 1.5em;
+  margin: 0;
+  color: var(--muted-on-dark);
+  font-size: 0.95rem;
+}
+
+/* could not start */
+.activity-boot.has-error .mm-visual {
+  width: min(170px, 40vw, 22vh);
+}
+
+.activity-boot.has-error .mm-ring {
+  display: none;
+}
+
+.activity-error {
+  gap: 10px;
+  width: 100%;
+  max-width: 480px;
+  padding: 22px 20px 18px;
+  text-align: center;
+}
+
+.activity-error h1 {
+  margin: 0;
+  font-size: clamp(1.3rem, 4.5vw, 1.7rem);
+  line-height: 1.2;
+}
+
+.activity-error .lead {
+  margin: 0;
+}
+
+.activity-error-icon {
+  width: 76px;
+  height: 76px;
+  margin-bottom: 2px;
+  background: var(--pink);
+}
+
+.activity-error-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.activity-error-actions .btn:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.activity-error-code {
+  margin: 4px 0 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  overflow-wrap: anywhere;
+}
+
+/* --- a link that could not be opened ---------------------------------------- */
+
+.activity-notice {
+  position: fixed;
+  left: 50%;
+  bottom: calc(16px + var(--saib));
+  z-index: 70;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: max-content;
+  max-width: min(560px, calc(100% - 24px));
+  padding: 10px 12px 10px 16px;
+  border: var(--border);
+  border-radius: 14px;
+  background: var(--card);
+  color: var(--ink);
+  font-weight: 600;
+  box-shadow: var(--shadow);
+  transform: translateX(-50%);
+}
+
+.activity-notice p {
+  min-width: 0;
+  margin: 0;
+}
+
+.activity-notice-url {
+  font-weight: 700;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
+/* --- picture-in-picture: the small tile ---------------------------------------- */
+
+/* nothing but the tile: no page behind it, no scrollbars */
+html:has(.activity-shell.is-compact),
+body:has(.activity-shell.is-compact) {
+  overflow: hidden;
+}
+
+body:has(.activity-shell.is-compact) .footer {
+  display: none;
+}
+
+.activity-pip {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  align-items: center;
+  justify-items: center;
+  gap: 2vmin;
+  padding: max(3.5vmin, 8px);
+  overflow: hidden;
+  background:
+    radial-gradient(120vmax 80vmax at 0% 0%, #5b1fa8 0%, transparent 60%),
+    radial-gradient(100vmax 80vmax at 100% 100%, #8a1e6e 0%, transparent 55%),
+    var(--bg);
+  color: var(--white);
+  text-align: center;
+}
+
+.activity-pip-logo {
+  width: clamp(40px, 20vmin, 92px);
+  height: auto;
+  filter: drop-shadow(0 3px 0 rgba(0, 0, 0, 0.3));
+}
+
+.activity-pip-body {
+  display: grid;
+  justify-items: center;
+  gap: 1vmin;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.activity-pip-round {
+  color: var(--muted-on-dark);
+  font-size: clamp(0.72rem, 5vmin, 1rem);
+  font-weight: 600;
+}
+
+.activity-pip-phase {
+  font-size: clamp(1rem, 9vmin, 2rem);
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+  text-shadow: 0 3px 0 var(--ink);
+}
+
+.activity-pip-timer {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25em;
+  color: var(--yellow);
+  font-family: var(--meme);
+  font-size: clamp(1.3rem, 15vmin, 3.2rem);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.03em;
+  line-height: 1;
+  text-shadow: 0 3px 0 var(--ink);
+}
+
+.activity-pip-timer svg {
+  width: 0.6em;
+  height: 0.6em;
+}
+
+.activity-pip.is-urgent .activity-pip-timer {
+  color: var(--pink);
+}
+
+.activity-pip-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px 10px;
+  font-size: clamp(0.72rem, 4.8vmin, 0.95rem);
+  font-weight: 700;
+}
+
+.activity-pip-players {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--muted-on-dark);
+}
+
+.activity-pip-cta {
+  padding: 0.3em 0.9em;
+  border: 2px solid var(--glass-border);
+  border-radius: 999px;
+  background: var(--glass-bg);
+}
+
+.activity-pip.is-turn .activity-pip-cta {
+  border-color: var(--ink);
+  background: var(--yellow);
+  color: var(--ink);
+  box-shadow: 0 3px 0 var(--ink);
+  animation: pip-nudge 1.6s var(--ease-out) infinite;
+}
+
+@keyframes pip-nudge {
+  50% {
+    transform: translateY(-3px);
+  }
+}
+
+/* a very flat tile: logo and text side by side */
+@media (max-height: 150px) {
+  .activity-pip {
+    grid-template-rows: 1fr;
+    grid-template-columns: auto 1fr;
+    gap: 3vmin;
+  }
+
+  .activity-pip-foot {
+    display: none;
+  }
+}
+
+/* --- phones ------------------------------------------------------------------------ */
+
+/* the keyboard lies on top of the frame: room to scroll the text field above it */
+.activity-shell[data-keyboard='open'] {
+  padding-bottom: min(46vh, 340px);
+}
+
+.activity-shell.is-mobile .btn {
+  min-height: 48px;
+}
+
+.activity-shell.is-mobile .btn-small {
+  min-height: 44px;
+  padding-left: 14px;
+  padding-right: 14px;
+}
+
+/* 16px keeps iOS from zooming into a field that gets the focus */
+.activity-shell.is-mobile input:not([type='checkbox'], [type='radio'], [type='range'], [type='color'], [type='file']),
+.activity-shell.is-mobile textarea,
+.activity-shell.is-mobile select {
+  min-height: 48px;
+  font-size: max(16px, 1em);
+}
+
+.activity-shell.is-mobile .header.in-activity .main-nav a,
+.activity-shell.is-mobile .header.in-activity .lang-switch button,
+.activity-shell.is-mobile .header.in-activity .account-trigger {
+  min-height: 44px;
+}
+
+.activity-shell.is-mobile .activity-person {
+  width: 32px;
+  height: 32px;
+}
+
+/* a short frame (phone held sideways, grid tile): less air above the game */
+@media (max-height: 480px) {
+  .activity-boot {
+    padding-top: 0;
+  }
+
+  .activity-boot .mm-visual {
+    width: min(190px, 34vh);
+  }
+
+  .activity-people {
+    min-height: 28px;
+    margin-bottom: 4px;
+  }
+}
+
+/* --- outside of Discord (/activity in a normal browser) ----------------------------- */
+
+.activity-outside {
+  gap: 12px;
+  padding: 26px 22px 22px;
+}
+
+.activity-outside h1,
+.activity-outside .lead {
+  margin: 0;
+}
+
+.activity-howto {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+  margin: 4px 0;
+  padding: 0;
+  counter-reset: howto;
+  list-style: none;
+  text-align: left;
+}
+
+.activity-howto li {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 2px solid var(--ink);
+  border-radius: var(--radius-sm);
+  background: var(--white);
+  font-weight: 600;
+  counter-increment: howto;
+}
+
+.activity-howto li::before {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 2px solid var(--ink);
+  border-radius: 50%;
+  background: var(--yellow);
+  font-size: 0.85rem;
+  font-weight: 700;
+  content: counter(howto);
+}
+
+.activity-howto svg {
+  color: #5865f2;
+}
+
+.activity-outside-off {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 8px 12px;
+  border: 2px solid var(--ink);
+  border-radius: 12px;
+  background: #ffe89a;
+  font-size: 0.92rem;
+  font-weight: 600;
+  text-align: left;
+}
+
+.activity-outside-off svg {
+  flex: none;
+}
+
+.activity-outside-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+/* "Play on Discord" (components/PlayOnDiscord.jsx) */
+.btn-discord,
+a.btn.btn-discord {
+  --btn-bg: #5865f2;
+  color: var(--white);
+}
+
+/* --- less motion ------------------------------------------------------------------ */
+
+@media (prefers-reduced-motion: reduce) {
+  .activity-steps li {
+    transition: none;
+  }
+
+  .activity-steps li.is-active {
+    transform: none;
+  }
+
+  .activity-pip.is-turn .activity-pip-cta {
+    animation: none;
+  }
+}

@@ -5,6 +5,8 @@ export const metadata = {
   robots: { index: false, follow: false },
 };
 
-export default function ActivityPage() {
-  return <ActivityApp />;
+export default async function ActivityPage({ searchParams }) {
+  const q = await searchParams;
+  // Discord opens the frame with these parameters; without them this is a normal browser
+  return <ActivityApp outside={!(q?.frame_id && q?.instance_id)} />;
 }

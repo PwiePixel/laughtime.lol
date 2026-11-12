@@ -3,7 +3,7 @@ import next from 'next';
 import { WebSocketServer } from 'ws';
 import { ROOM_CODE_RE } from '../lib/shared.js';
 import { isAdmin, purgeExpiredSessions, userFromRequest } from './accounts.js';
-import { isActivityRequest } from './activity.js';
+import { activityFramePolicy, isActivityRequest } from './activity.js';
 import { handleApi } from './api.js';
 import { requestChannel } from './channel.js';
 import { ROOT, getConfig } from './config.js';
@@ -29,17 +29,6 @@ import { apiCache, compressJson, invalidateAfterWrite } from './lib/respond.js';
 
 const roomLimiter = createLimiter({ windowMs: 60_000, max: 12 });
 
-// who may show /activity in a frame: Discord (web, desktop, mobile) and its proxy
-const ACTIVITY_FRAME_ANCESTORS = [
-  "'self'",
-  'https://discord.com',
-  'https://*.discord.com',
-  'https://discordapp.com',
-  'https://*.discordapp.com',
-  'https://*.discordsays.com',
-  // local test harness (the SDK accepts http://localhost:3333 as a Discord origin)
-  ...(process.env.ACTIVITY_DEV_FRAME ? [process.env.ACTIVITY_DEV_FRAME] : []),
-].join(' ');
 const roomUploadLimiter = createLimiter({ windowMs: 10 * 60_000, max: 40 });
 
 export async function startServer({ dev = false, dir = ROOT } = {}) {
@@ -180,9 +169,8 @@ export async function startServer({ dev = false, dir = ROOT } = {}) {
       if (await handleApi(req, res, url)) return undefined;
       if (p.startsWith('/api/')) return json(res, 404, { error: 'not_found' });
       // Discord Activity: "/?frame_id=…" (how Discord opens it) and /activity may be framed by Discord
-      if (p === '/activity' || p.startsWith('/activity/') || (p === '/' && url.searchParams.has('frame_id'))) {
-        res.setHeader('Content-Security-Policy', `frame-ancestors ${ACTIVITY_FRAME_ANCESTORS}`);
-      }
+      const framePolicy = activityFramePolicy(p, url.searchParams);
+      if (framePolicy) res.setHeader('Content-Security-Policy', framePolicy);
       return await handle(req, res);
     } catch (err) {
       console.error('[http]', err);

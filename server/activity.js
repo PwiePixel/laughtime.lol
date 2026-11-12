@@ -71,6 +71,39 @@ export function isActivityOrigin(origin) {
   return Boolean(enabled && proxyHost && hostOf(origin) === proxyHost);
 }
 
+// --- embedding -----------------------------------------------------------------------
+
+// who may show the activity in a frame: Discord (web, desktop, mobile) and its proxy
+const FRAME_ANCESTORS = [
+  "'self'",
+  'https://discord.com',
+  'https://*.discord.com',
+  'https://discordapp.com',
+  'https://*.discordapp.com',
+  'https://*.discordsays.com',
+];
+const ORIGIN_RE = /^https?:\/\/[a-z0-9.-]+(?::\d{1,5})?$/i;
+
+function frameAncestors() {
+  // local test harness (the SDK accepts http://localhost:3333 as a Discord origin)
+  const dev = String(process.env.ACTIVITY_DEV_FRAME || '').trim();
+  return [...FRAME_ANCESTORS, ...(ORIGIN_RE.test(dev) ? [dev] : [])].join(' ');
+}
+
+/**
+ * Content-Security-Policy header for a page, or null when the page needs none.
+ * Only /activity and "/?frame_id=…&instance_id=…" (how Discord opens the root
+ * of the URL mapping) may be shown in a frame by Discord. next.config.mjs
+ * leaves out X-Frame-Options for every address that carries frame_id, so all
+ * other addresses with that parameter are locked here.
+ */
+export function activityFramePolicy(pathname, searchParams) {
+  const activityPage = pathname === '/activity' || pathname.startsWith('/activity/');
+  const activityRoot = pathname === '/' && searchParams.has('frame_id') && searchParams.has('instance_id');
+  if (activityPage || activityRoot) return `frame-ancestors ${frameAncestors()}`;
+  return searchParams.has('frame_id') ? "frame-ancestors 'self'" : null;
+}
+
 // --- instance verification (optional, needs DISCORD_BOT_TOKEN) ------------------
 
 // the lookups are cached and de-duplicated in discord.js
