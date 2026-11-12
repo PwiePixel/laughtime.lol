@@ -865,7 +865,20 @@ button.strip-player {
 }
 
 .vote-dock .reaction-bar {
+  /* always one row, like on the cards: with the bigger touch size of the app shell
+     (app/pwa.css) the eighth button dropped to a second line on phones */
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 46px);
+  justify-content: center;
+  width: 100%;
   margin-top: 0;
+}
+
+.vote-dock .reaction-bar button {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
 }
 
 .rating {
