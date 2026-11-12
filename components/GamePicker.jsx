@@ -1,14 +1,14 @@
 'use client';
 
 import { useEffect } from 'react';
-import { GAME_MODES } from '@/lib/shared';
+import { gamesFor } from '@/lib/shared';
 import { usePublicInfo } from '@/lib/usePublicInfo';
 import Icon from './Icon';
 import { useApp } from './Providers';
 
 /** Small game selection window: Classic or GIF Hunt. */
 export default function GamePicker({ purpose = 'quick', busy = null, onPick, onClose }) {
-  const { t } = useApp();
+  const { t, channel } = useApp();
   const info = usePublicInfo();
 
   useEffect(() => {
@@ -35,7 +35,7 @@ export default function GamePicker({ purpose = 'quick', busy = null, onPick, onC
           </button>
         </div>
         <div className="game-options">
-          {GAME_MODES.filter((g) => purpose !== 'quick' || !g.privateOnly).map((g) => (
+          {gamesFor({ channel, isPublic: purpose === 'quick' }).map((g) => (
             <button
               key={g.id}
               type="button"

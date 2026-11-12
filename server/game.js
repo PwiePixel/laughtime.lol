@@ -1,10 +1,9 @@
 import crypto from 'node:crypto';
 import {
-  GAME_IDS,
-  PUBLIC_GAME_IDS,
   REACTIONS,
   ROOM_CODE_CHARS,
   ROOM_CODE_RE,
+  gameAllowed,
   hasText,
   presetFor,
   sanitizeAvatar,
@@ -77,8 +76,8 @@ export function createRoom({ game = 'classic', isPublic = false, activity = null
   const cfg = getConfig();
   if (rooms.size >= cfg.maxRooms) return null;
   const code = newCode();
-  const allowed = isPublic ? PUBLIC_GAME_IDS : GAME_IDS;
-  const settings = presetFor(allowed.includes(game) ? game : 'classic');
+  // beta modes only in beta rooms, private-only modes never in public rooms
+  const settings = presetFor(gameAllowed(game, { channel, isPublic }) ? game : 'classic');
   if (isPublic) settings.maxPlayers = cfg.matchMax;
   const room = {
     code,
@@ -1174,7 +1173,7 @@ function handleMessage(ws, msg) {
     }
     case 'settings':
       if (!isHost(ws) || room.phase !== 'lobby') return;
-      room.settings = sanitizeSettings(msg.settings, room.settings);
+      room.settings = sanitizeSettings(msg.settings, room.settings, { channel: room.channel });
       return broadcast(room);
     case 'pack': {
       if (!isHost(ws) || room.phase !== 'lobby') return;

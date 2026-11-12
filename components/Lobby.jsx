@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { GAME_MODES, SETTING_OPTIONS, sanitizeName } from '@/lib/shared';
+import { GAME_MODES, SETTING_OPTIONS, gameAllowed, sanitizeName } from '@/lib/shared';
 import { MASK, copyText } from '@/lib/streamer';
 import { usePublicInfo } from '@/lib/usePublicInfo';
 import Avatar from './Avatar';
@@ -247,7 +247,8 @@ function PrivateLobby({ game }) {
         <div className="setting-row">
           <span className="setting-label">{t('lobby.game')}</span>
           <div className="game-switch" role="radiogroup" aria-label={t('lobby.game')}>
-            {GAME_MODES.map((g) => (
+            {/* beta modes only in beta rooms; the game a room plays is always shown */}
+            {GAME_MODES.filter((g) => g.id === state.settings.game || gameAllowed(g.id, { channel: state.channel })).map((g) => (
               <button
                 key={g.id}
                 type="button"
