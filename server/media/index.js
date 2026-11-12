@@ -1,11 +1,17 @@
+import crypto from 'node:crypto';
+import path from 'node:path';
 import { getConfig } from '../config.js';
+import { persistOutbound } from '../lib/outbound.js';
 import { loadGiphyVideos } from './giphy.js';
+import { applyBudgets } from './http.js';
 import { loadImgflipImages, loadImgflipVideos } from './imgflip.js';
 import { loadKlipyVideos } from './klipy.js';
+import { createMediaPool } from './pool.js';
 import { loadRedditImages, loadRedditVideos } from './reddit.js';
 
 // Media pool: pulls templates and short clips from all configured sources,
-// keeps them in memory and refreshes them in the background.
+// keeps them in memory and refreshes them in the background. The schedule
+// (jitter, back-off after errors) and the copy on disk live in pool.js.
 
 const FALLBACK_IMAGES = [
   ['181913649', 'Drake Hotline Bling', '30b1gx.jpg', 1200, 1200],
@@ -39,16 +45,63 @@ const FALLBACK_VIDEOS = [
   link: `https://imgflip.com/gif-maker/${id}`,
 }));
 
+// fingerprint of the settings a source depends on: when they change, the saved
+// pool of that source is refreshed right after the restart (keys are only hashed)
+const sig = (...parts) => crypto.createHash('sha1').update(JSON.stringify(parts)).digest('hex').slice(0, 12);
+
+// on:   is the source switched on with the current settings? (no request is made to find out)
+// load: fetch the items
 const SOURCES = [
-  { key: 'imgflip-images', kind: 'image', source: 'imgflip', load: (c) => (c.imgflipEnabled ? loadImgflipImages(c) : null) },
-  { key: 'imgflip-videos', kind: 'video', source: 'imgflip', load: (c) => (c.imgflipEnabled ? loadImgflipVideos(c) : null) },
-  { key: 'giphy', kind: 'video', source: 'giphy', load: loadGiphyVideos },
-  { key: 'klipy', kind: 'video', source: 'klipy', load: loadKlipyVideos },
-  { key: 'reddit-videos', kind: 'video', source: 'reddit', load: loadRedditVideos },
-  { key: 'reddit-images', kind: 'image', source: 'reddit', load: loadRedditImages },
+  {
+    key: 'imgflip-images',
+    kind: 'image',
+    source: 'imgflip',
+    on: (c) => c.imgflipEnabled,
+    sig: (c) => sig(c.imgflipPages),
+    load: (c) => (c.imgflipEnabled ? loadImgflipImages(c) : null),
+  },
+  {
+    key: 'imgflip-videos',
+    kind: 'video',
+    source: 'imgflip',
+    on: (c) => c.imgflipEnabled,
+    sig: (c) => sig(c.imgflipPages),
+    load: (c) => (c.imgflipEnabled ? loadImgflipVideos(c) : null),
+  },
+  {
+    key: 'giphy',
+    kind: 'video',
+    source: 'giphy',
+    on: (c) => Boolean(c.giphyKey),
+    sig: (c) => sig(c.giphyKey, c.giphyApiBase, c.contentRating, c.searchTerms),
+    load: loadGiphyVideos,
+  },
+  {
+    key: 'klipy',
+    kind: 'video',
+    source: 'klipy',
+    on: (c) => Boolean(c.klipyKey),
+    sig: (c) => sig(c.klipyKey, c.klipyApiBase, c.klipyTypes, c.klipyLocale, c.contentRating, c.searchTerms),
+    load: loadKlipyVideos,
+  },
+  {
+    key: 'reddit-videos',
+    kind: 'video',
+    source: 'reddit',
+    on: (c) => c.redditEnabled && c.redditVideoSubs.length > 0,
+    sig: (c) => sig(c.redditVideoSubs, c.maxVideoSeconds, Boolean(c.redditClientId)),
+    load: loadRedditVideos,
+  },
+  {
+    key: 'reddit-images',
+    kind: 'image',
+    source: 'reddit',
+    on: (c) => c.redditEnabled && c.redditImageSubs.length > 0,
+    sig: (c) => sig(c.redditImageSubs, Boolean(c.redditClientId)),
+    load: loadRedditImages,
+  },
 ];
 
-const REFRESH_MS = 30 * 60 * 1000;
 const BROKEN_TTL = 6 * 60 * 60 * 1000;
 const broken = new Map(); // url -> time it failed
 
@@ -56,71 +109,44 @@ const broken = new Map(); // url -> time it failed
 export function markBroken(url) {
   broken.set(url, Date.now());
 }
-const RETRY_MS = 5 * 60 * 1000;
-
-const state = {
-  // key -> { items, status: 'off'|'ok'|'error'|'loading', error, updatedAt }
-  sources: new Map(SOURCES.map((s) => [s.key, { items: [], status: 'loading', error: null, updatedAt: 0 }])),
-  firstLoad: null,
-  timer: null,
-};
 
 function isAllowed(item, cfg) {
   const t = String(item.title || '').toLowerCase();
   return !cfg.blockedWords.some((w) => t.includes(w));
 }
 
-async function refreshSource(src) {
-  const cfg = getConfig();
-  const entry = state.sources.get(src.key);
-  try {
-    const items = await src.load(cfg);
-    if (items === null) {
-      entry.status = 'off';
-      entry.items = [];
-      return;
-    }
-    const seen = new Set();
-    const clean = items.filter((i) => i.url && isAllowed(i, cfg) && !seen.has(i.id) && seen.add(i.id));
-    if (clean.length) {
-      entry.items = clean;
-      entry.status = 'ok';
-      entry.error = null;
-    } else if (!entry.items.length) {
-      entry.status = 'error';
-      entry.error = 'no items returned';
-    }
-    entry.updatedAt = Date.now();
-  } catch (err) {
-    entry.status = entry.items.length ? 'ok' : 'error';
-    entry.error = String(err?.message || err);
-    console.warn(`[media] ${src.key}: ${entry.error}`);
-  }
-}
-
-export async function refreshAll() {
+function forgetOldBroken() {
   const cutoff = Date.now() - BROKEN_TTL;
   for (const [url, t] of broken) if (t < cutoff) broken.delete(url);
-  await Promise.all(SOURCES.map(refreshSource));
-  const summary = SOURCES.map((s) => {
-    const e = state.sources.get(s.key);
-    return `${s.key}=${e.status === 'ok' ? e.items.length : e.status}`;
-  }).join('  ');
-  console.log(`[media] ${summary}`);
+}
+
+const pool = createMediaPool({
+  sources: SOURCES,
+  // resolved late: the cache folder comes from the settings
+  file: () => path.join(getConfig().cacheDir, 'pool.json'),
+  getCfg: getConfig,
+  allow: isAllowed,
+  beforeRefresh: forgetOldBroken,
+});
+
+const state = {
+  // key -> { items, status: 'off'|'ok'|'error'|'loading', error, updatedAt, failures, nextAt }
+  sources: pool.entries,
+  firstLoad: null,
+};
+
+/** Load every source now, no matter when it is due. */
+export async function refreshAll() {
+  await pool.refreshDue({ force: true });
 }
 
 export function startMediaPool() {
   if (state.firstLoad) return state.firstLoad;
-  state.firstLoad = refreshAll();
-  const loop = () => {
-    const anyError = [...state.sources.values()].some((e) => e.status === 'error');
-    state.timer = setTimeout(async () => {
-      await refreshAll();
-      loop();
-    }, anyError ? RETRY_MS : REFRESH_MS);
-    state.timer.unref?.();
-  };
-  state.firstLoad.then(loop);
+  // hourly budgets and rate-limit pauses of the APIs survive restarts as well
+  applyBudgets();
+  state.firstLoad = persistOutbound(path.join(getConfig().cacheDir, 'outbound.json'))
+    .catch(() => {})
+    .then(() => pool.start());
   return state.firstLoad;
 }
 
@@ -165,7 +191,16 @@ export function mediaStatus() {
   const out = {};
   for (const s of SOURCES) {
     const e = state.sources.get(s.key);
-    out[s.key] = { status: e.status, count: e.items.length, error: e.error, updatedAt: e.updatedAt };
+    out[s.key] = {
+      status: e.status,
+      count: e.items.length,
+      error: e.error,
+      updatedAt: e.updatedAt,
+      // errors in a row, when the next load is due and whether the items come from the saved pool
+      failures: e.status === 'off' ? 0 : e.failures,
+      nextInMs: e.status === 'off' ? null : Math.max(0, e.nextAt - Date.now()),
+      restored: e.restored,
+    };
   }
   return {
     sources: out,
@@ -189,6 +224,9 @@ export function allPoolItems(kind) {
 }
 
 export const isBroken = (url) => broken.has(url);
+
+/** numbers for /api/status */
+export const poolStats = () => pool.stats();
 
 const words = (s) =>
   String(s || '')
