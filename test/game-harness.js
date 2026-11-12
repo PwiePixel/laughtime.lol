@@ -123,7 +123,8 @@ export function setupGame(env = {}) {
       now: () => Date.now(),
       /** let the clock run and give promises a chance to settle */
       async advance(ms) {
-        mock.timers.tick(ms);
+        // millisecond steps: a timer that fires sees its own time, so timers started by timers stay exact
+        for (let i = 0; i < ms; i++) mock.timers.tick(1);
         await flush();
       },
       client: (opts) => new Client(ctx, opts),
@@ -149,10 +150,56 @@ export function setupGame(env = {}) {
         host.send({ t: 'start' });
         await flush();
       },
+      /**
+       * Replaces the media search. `answers`: { term: items } or a function (q, opts) => items.
+       * Returns the list of calls that reached the "provider".
+       */
+      search(answers = (q) => hits(q)) {
+        const calls = [];
+        game._test.setSearch(async (q, opts) => {
+          calls.push(q);
+          return typeof answers === 'function' ? answers(q, opts) : answers[q] || [];
+        });
+        return calls;
+      },
+      /** uploads a picture in the bring phase of a swap round, like the HTTP route does */
+      async upload(client, code) {
+        const { sniffImage } = await import('../server/uploads.js');
+        return game.handleRoomUpload(code, client.pid, client.secret, { buf: PNG, info: sniffImage(PNG), name: `secret name of ${client.name}` });
+      },
+      /** waits for real I/O (files, database) */
+      async until(check, what = 'condition') {
+        for (let i = 0; i < 5000; i++) {
+          if (check()) return;
+          await new Promise((r) => setImmediate(r));
+        }
+        throw new Error(`timeout waiting for ${what}`);
+      },
     };
     return ctx;
   })();
   return ready;
 }
+
+/** search hits as a provider would return them: `hits('cats', 20)` */
+export function hits(q, n = 20, kind = 'video') {
+  return Array.from({ length: n }, (_, i) => ({
+    id: `test:${q}:${i}`,
+    kind,
+    url: `https://media.test/${encodeURIComponent(q)}/${i}.${kind === 'video' ? 'mp4' : 'jpg'}`,
+    thumb: `https://media.test/${encodeURIComponent(q)}/${i}-small.jpg`,
+    width: 480,
+    height: 270,
+    title: `${q} ${i}`,
+    source: 'giphy',
+    link: `https://media.test/view/${i}`,
+  }));
+}
+
+/** the smallest picture the upload code accepts (1x1 PNG) */
+export const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
+
+/** id of the original media behind a proxied address */
+export const originalUrl = (media) => new URL(media.src, 'http://x').searchParams.get('u');
 
 export const caption = (text) => [{ text, x: 50, y: 12, w: 92, size: 8, color: '#FFFFFF', upper: true }];
