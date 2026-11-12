@@ -11,6 +11,7 @@ import {
   LogIn,
   LogOut,
   Medal,
+  Moon,
   Settings,
   Share2,
   Swords,
@@ -199,6 +200,7 @@ const ICONS = {
   'image-up': ImageUp,
   flag: Flag,
   approved: BadgeCheck,
+  moon: Moon,
 };
 
 /** Discord brand glyph (lucide has no brand icons). */

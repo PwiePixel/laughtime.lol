@@ -1,1 +1,1880 @@
-/* LaughTime v2 – modes-v2 */
+/* ------------------------------------------------------------------
+   LaughTime v2 – game screens.
+   Same look as before (ink outlines, hard shadows, party colours);
+   this file adds the new building blocks (hand tray, action bar, last
+   call, vote distribution, awards) and the motion polish.
+   Animations use transform and opacity only.
+   ------------------------------------------------------------------ */
+
+/* --- phase change -------------------------------------------------- */
+.phase-stage {
+  /* no fill at the end: nothing keeps a transform, so fixed children stay fixed */
+  animation: phase-in 350ms var(--ease-out) backwards;
+}
+
+@keyframes phase-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.985);
+  }
+}
+
+.phase-head h1:focus {
+  outline: none;
+}
+
+.phase-head h1:focus-visible {
+  outline: 3px solid var(--yellow);
+  outline-offset: 4px;
+  border-radius: 6px;
+}
+
+.is-flipped {
+  transform: rotate(180deg);
+}
+
+/* --- timer: the bar follows the server clock via transform ---------- */
+.timer-bar span {
+  width: 100%;
+  transform-origin: left center;
+  transition: none;
+  will-change: transform;
+}
+
+.timer.is-compact {
+  width: auto;
+  min-width: 0;
+}
+
+.timer.is-compact .timer-num {
+  min-width: 44px;
+  height: 44px;
+  font-size: 1.1rem;
+  box-shadow: 0 3px 0 var(--ink);
+}
+
+/* --- sub line of a phase / last call -------------------------------- */
+.phase-sub {
+  min-height: 1.6em;
+}
+
+.last-call {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 0 12px 0 8px;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  background: var(--pink);
+  color: var(--ink);
+  box-shadow: var(--glow-pink);
+  animation: last-call-in var(--dur-slow) var(--ease-spring) both;
+}
+
+.last-call svg {
+  flex: none;
+  animation: hourglass 1.6s ease-in-out infinite;
+}
+
+.last-call strong {
+  flex: none;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.last-call span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@keyframes last-call-in {
+  from {
+    opacity: 0;
+    transform: scale(0.7) rotate(-3deg);
+  }
+}
+
+@keyframes hourglass {
+  0%,
+  40% {
+    transform: rotate(0);
+  }
+  60%,
+  100% {
+    transform: rotate(180deg);
+  }
+}
+
+/* --- player strip ---------------------------------------------------- */
+.player-strip {
+  background: var(--glass-bg);
+  border-color: var(--glass-border);
+}
+
+.strip-player {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+button.strip-player {
+  cursor: pointer;
+}
+
+.strip-list li.is-away .avatar {
+  opacity: 0.5;
+  filter: grayscale(0.8);
+}
+
+.strip-list li.is-away .strip-name {
+  opacity: 0.6;
+}
+
+.check {
+  animation: badge-pop var(--dur-slow) var(--ease-spring) both;
+}
+
+.check.is-search {
+  background: var(--cyan);
+}
+
+.check.is-away {
+  background: #c9b8ec;
+}
+
+@keyframes badge-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.2);
+  }
+}
+
+.strip-streak,
+.lb-streak {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  flex: none;
+  color: var(--orange);
+  font-weight: 700;
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.lb-streak {
+  color: #d9530b;
+}
+
+.strip-streak svg,
+.lb-streak svg {
+  animation: flame 1.4s ease-in-out infinite;
+  transform-origin: 50% 90%;
+}
+
+@keyframes flame {
+  50% {
+    transform: scale(1.18) rotate(-6deg);
+  }
+}
+
+.public-chip.hunt-chip {
+  background: color-mix(in srgb, var(--game, var(--cyan)) 18%, transparent);
+  color: var(--game, var(--cyan));
+}
+
+/* --- action bar (phones) ---------------------------------------------- */
+.action-bar {
+  display: none;
+}
+
+/* --- shared bits ------------------------------------------------------ */
+.dots {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 5px;
+}
+
+.dots i {
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--ink);
+  border-radius: 50%;
+  background: rgba(23, 10, 46, 0.1);
+  transition:
+    background var(--dur) linear,
+    transform var(--dur-slow) var(--ease-spring);
+}
+
+.dots i.on {
+  background: var(--green);
+  transform: scale(1.15);
+}
+
+.wait-progress {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  margin: 0;
+  font-weight: 600;
+}
+
+.wait-hint {
+  margin: 8px 0 0;
+  color: var(--muted);
+}
+
+/* reaction buttons were made for the dark page - on cream cards they get a dark chip */
+.card .reaction-bar {
+  margin-top: 4px;
+}
+
+.card .reaction-bar button {
+  border-color: var(--ink);
+  background: #2a1057;
+}
+
+.reaction-bar button {
+  transition: transform var(--dur-fast) var(--ease-spring);
+}
+
+.reaction-bar button:hover {
+  transform: translateY(-2px);
+}
+
+.reaction-bar button:active {
+  transform: scale(1.25);
+}
+
+.chip,
+.game-switch-btn,
+.swap-tabs button {
+  transition:
+    transform var(--dur-fast) var(--ease-spring),
+    background var(--dur-fast) linear;
+}
+
+.chip:active:not(:disabled),
+.swap-tabs button:active {
+  transform: scale(0.94);
+}
+
+.beta-chip {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 7px;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  background: var(--pink);
+  color: var(--ink);
+  font-size: 0.62rem;
+  font-weight: 700;
+  line-height: 1.5;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+
+.mode-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0 0 4px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: #f1e9fb;
+  font-weight: 600;
+}
+
+.mode-note svg {
+  flex: none;
+  margin-top: 2px;
+}
+
+/* --- caption ---------------------------------------------------------- */
+.caption-phase {
+  --stage-h: min(62vh, 640px);
+}
+
+.stage-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  max-width: 100%;
+  margin: 10px auto 0;
+  padding: 2px 12px;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  background: var(--pink);
+  color: var(--ink);
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.caption-extra {
+  display: grid;
+  gap: 14px;
+}
+
+.more-toggle {
+  display: none;
+}
+
+/* GIF Hunt: search card */
+.hunt-start {
+  gap: 12px;
+}
+
+.hunt-start .hunt-badge {
+  width: 80px;
+  height: 80px;
+}
+
+.idea-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 36px;
+}
+
+.idea-label,
+.idea-left {
+  color: var(--muted);
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.idea-left {
+  margin-left: auto;
+  font-weight: 600;
+}
+
+.idea-chip {
+  background: #e3f9ff;
+}
+
+.hunt-lucky {
+  white-space: nowrap;
+}
+
+.hunt-empty,
+.hunt-out {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: #ffe9f3;
+  font-weight: 600;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+.hunt-out {
+  align-items: center;
+  background: #f1e9fb;
+}
+
+.hunt-empty svg,
+.hunt-out svg {
+  flex: none;
+  margin-top: 2px;
+}
+
+.hand-skeleton {
+  display: grid;
+  grid-template-columns: repeat(4, 72px);
+  justify-content: center;
+  gap: 6px;
+}
+
+.hand-skeleton i,
+.tile-skeleton {
+  display: block;
+  aspect-ratio: 1;
+  border: 2px solid rgba(23, 10, 46, 0.18);
+  border-radius: 12px;
+  background: linear-gradient(100deg, #e9dff7 20%, #fff 40%, #e9dff7 60%);
+  background-size: 200% 100%;
+  animation:
+    shimmer 1.2s linear infinite,
+    badge-pop var(--dur-slow) var(--ease-spring) backwards;
+  animation-delay: calc(var(--i, 0) * 60ms);
+}
+
+.hunt-more {
+  display: grid;
+  gap: 10px;
+  padding-bottom: 14px;
+  border-bottom: 2px dashed rgba(23, 10, 46, 0.18);
+}
+
+.hunt-more .hand-skeleton {
+  justify-content: start;
+}
+
+.hunt-again {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.hunt-form.is-compact {
+  flex: 1;
+  flex-direction: row;
+  width: auto;
+  min-width: 0;
+}
+
+.hunt-form.is-compact .btn {
+  padding-left: 14px;
+  padding-right: 14px;
+}
+
+.hunt-again .hunt-lucky {
+  min-height: 48px;
+  box-shadow: var(--shadow-sm);
+}
+
+/* the hand: tiles to choose from */
+.hand {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.hand-title {
+  margin: 0;
+  font-weight: 700;
+  font-size: 0.92rem;
+}
+
+.hand-scroll {
+  display: flex;
+  gap: 12px;
+  min-width: 0;
+  padding: 6px 4px 8px;
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  scrollbar-width: thin;
+}
+
+.hand-group {
+  display: grid;
+  gap: 4px;
+  flex: none;
+  scroll-snap-align: start;
+}
+
+.hand-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 228px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.hand-label svg {
+  flex: none;
+}
+
+.hand-label span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hand-tiles {
+  display: flex;
+  gap: 6px;
+}
+
+.hand-tile {
+  position: relative;
+  flex: none;
+  width: 72px;
+  height: 72px;
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  background: none;
+  cursor: pointer;
+  transition: transform var(--dur-fast) var(--ease-spring);
+}
+
+.hand-tile .media-thumb {
+  width: 100%;
+  height: 100%;
+  transition: box-shadow var(--dur-fast) linear;
+}
+
+.hand-tile:hover:not(.on) {
+  transform: translateY(-3px);
+}
+
+.hand-tile:active {
+  transform: scale(0.93);
+}
+
+.hand-tile:focus-visible {
+  outline: 3px solid var(--pink);
+  outline-offset: 2px;
+}
+
+.hand-tile.on {
+  cursor: default;
+}
+
+.hand-tile.on .media-thumb {
+  box-shadow:
+    0 0 0 4px var(--yellow),
+    0 0 0 6px var(--ink);
+}
+
+.hand-check {
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  z-index: 2;
+  display: none;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--ink);
+  border-radius: 50%;
+  background: var(--yellow);
+  color: var(--ink);
+}
+
+.hand-tile.on .hand-check {
+  display: grid;
+  animation: badge-pop var(--dur-slow) var(--ease-spring) both;
+}
+
+.hand-tile .gif-tag {
+  top: auto;
+  right: 4px;
+  bottom: 4px;
+}
+
+/* swap: the two pictures that came your way */
+.hand-duo {
+  padding-bottom: 14px;
+  border-bottom: 2px dashed rgba(23, 10, 46, 0.18);
+}
+
+.hand-duo-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  padding: 6px;
+}
+
+.hand-duo .hand-tile {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 4 / 3;
+}
+
+.hand-duo .hand-tile .media-thumb {
+  aspect-ratio: auto;
+}
+
+/* desktop: the tray sits in the editor panel, four tiles per row */
+@media (min-width: 961px) {
+  .hand-scroll {
+    flex-wrap: wrap;
+    overflow: visible;
+    gap: 8px 12px;
+  }
+}
+
+/* --- bring a picture (swap) ------------------------------------------- */
+.upload-phase {
+  --stage-h: min(44vh, 400px);
+}
+
+.swap-tabs button {
+  min-height: 44px;
+}
+
+.swap-panel {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+  min-height: 250px;
+}
+
+.swap-keep {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  border-radius: 14px;
+  background: #e5ffe0;
+}
+
+.swap-keep .media-thumb {
+  flex: none;
+  width: 48px;
+}
+
+.swap-surprise {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  text-align: center;
+}
+
+.swap-surprise p,
+.swap-surprise .big-icon {
+  margin: 0;
+}
+
+.big-icon.is-pink {
+  background: var(--pink);
+}
+
+.assist-line {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 6px;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0;
+  padding: 6px 12px;
+  border-radius: 12px;
+  background: #e5ffe0;
+  font-weight: 600;
+  font-size: 0.9rem;
+  text-align: left;
+}
+
+.assist-line.is-off {
+  background: #f1e9fb;
+  color: var(--muted);
+}
+
+.assist-line svg {
+  flex: none;
+  margin-top: 3px;
+}
+
+.swap-ending {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0 0;
+  font-weight: 700;
+}
+
+.swap-pick-hint {
+  margin: 0;
+}
+
+.pick-tile.is-picking .media-thumb {
+  outline: 4px solid var(--yellow);
+  outline-offset: -4px;
+  animation: pulse 0.7s ease-in-out infinite;
+}
+
+.pick-tile:disabled:not(.is-picking) {
+  opacity: 0.55;
+}
+
+.swap-progress .dots {
+  justify-content: flex-start;
+}
+
+.how-toggle {
+  display: none;
+}
+
+/* everybody is ready: the cards trade places for good */
+.is-ending .si-card.c1 {
+  animation: pass-right 1.2s var(--ease-out) infinite;
+}
+
+.is-ending .si-card.c2 {
+  animation: pass-left 1.2s var(--ease-out) infinite;
+}
+
+.is-ending .swap-chosen .meme-frame {
+  animation: pass-away 2.4s var(--ease-out) both;
+}
+
+@keyframes pass-right {
+  to {
+    transform: translateX(96px) rotate(8deg);
+  }
+}
+
+@keyframes pass-left {
+  to {
+    transform: translateX(-96px) rotate(-8deg);
+  }
+}
+
+@keyframes pass-away {
+  60% {
+    opacity: 1;
+    transform: rotate(-3deg) scale(0.96);
+  }
+  100% {
+    opacity: 0.25;
+    transform: translateX(40%) rotate(8deg) scale(0.8);
+  }
+}
+
+/* --- vote -------------------------------------------------------------- */
+.vote-phase {
+  /* meme, rating and result fit one screen: the meme takes what the rest leaves */
+  --stage-h: max(260px, min(54vh, 580px, 100vh - 530px));
+}
+
+.vote-meta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px 14px;
+  min-height: 36px;
+  margin-top: 8px;
+}
+
+.vote-meta .query-chip {
+  margin: 0;
+}
+
+.query-chip.is-secret {
+  border-style: dashed;
+  border-color: rgba(255, 255, 255, 0.4);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.55);
+  letter-spacing: 0.2em;
+}
+
+.query-chip.stamp-in {
+  animation: stamp var(--dur-slow) var(--ease-spring) both;
+}
+
+@keyframes stamp {
+  from {
+    opacity: 0;
+    transform: scale(1.9) rotate(-9deg);
+  }
+}
+
+.vote-meta .report-link {
+  min-height: 32px;
+}
+
+.take-chip {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 4;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 1px 10px;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  background: var(--green);
+  color: var(--ink);
+  font-size: 0.8rem;
+  font-weight: 700;
+  animation: stamp var(--dur-slow) var(--ease-spring) both;
+}
+
+/* rating controls and result share one place - the meme above never moves */
+.vote-dock {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-height: 216px;
+  margin-top: 6px;
+}
+
+.vote-controls {
+  margin-top: 0;
+  animation: fade-up var(--dur) var(--ease-out) both;
+}
+
+.vote-dock .reaction-bar {
+  margin-top: 0;
+}
+
+.rating {
+  min-height: 56px;
+}
+
+.rating.on {
+  box-shadow:
+    0 3px 0 var(--ink),
+    var(--glow-yellow);
+  animation: rate-pop var(--dur-slow) var(--ease-spring);
+}
+
+@keyframes rate-pop {
+  0% {
+    transform: scale(0.9);
+  }
+  60% {
+    transform: translateY(2px) rotate(-2deg) scale(1.08);
+  }
+}
+
+.vote-yours {
+  min-height: 104px;
+  margin: 0;
+}
+
+.vote-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 4px 12px;
+  min-height: 26px;
+  margin: 8px 0 0;
+  color: var(--muted-on-dark);
+  font-size: 0.85rem;
+}
+
+.vote-status-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.vote-status .dots i {
+  border-color: rgba(255, 255, 255, 0.45);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.vote-status .dots i.on {
+  border-color: var(--green);
+  background: var(--green);
+}
+
+.vote-keys {
+  display: none;
+  opacity: 0.7;
+}
+
+@media (hover: hover) and (min-width: 900px) {
+  .vote-keys {
+    display: inline;
+  }
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+/* the result of one meme */
+.reveal {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  justify-items: stretch;
+  gap: 8px 20px;
+  width: min(100%, 500px);
+  margin: 0 auto;
+  padding: 14px 20px;
+  text-align: left;
+  animation: reveal-in var(--dur-slow) var(--ease-spring) both;
+}
+
+.reveal.is-hot {
+  box-shadow:
+    var(--shadow),
+    var(--glow-yellow);
+}
+
+@keyframes reveal-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.86) rotate(-1.5deg);
+  }
+}
+
+.reveal-score {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  min-width: 120px;
+}
+
+.reveal-points {
+  font-size: 2rem;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  animation: points-pop 1.1s var(--ease-spring) both;
+}
+
+@keyframes points-pop {
+  0% {
+    transform: scale(0.6);
+  }
+  80% {
+    transform: scale(1.18) rotate(-3deg);
+  }
+}
+
+.reveal-avg {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.reveal .reveal-mystery {
+  grid-column: 1 / -1;
+  max-width: none;
+  margin-top: 0;
+  padding-top: 8px;
+}
+
+.reveal .mystery-avatar {
+  width: 34px;
+  height: 34px;
+}
+
+.vote-dist {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  align-items: end;
+  gap: 6px;
+  min-width: 0;
+}
+
+.vd-col {
+  --bar: var(--rc);
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+  min-width: 0;
+}
+
+.vd-col.rating-1 {
+  --bar: #b18cff;
+}
+
+.vd-col.rating-2 {
+  --bar: var(--cyan);
+}
+
+.vd-col.rating-3 {
+  --bar: var(--yellow);
+}
+
+.vd-col.rating-4 {
+  --bar: var(--pink);
+}
+
+.vd-col.rating-5 {
+  --bar: var(--green);
+}
+
+.vd-count {
+  font-size: 0.85rem;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.vd-col.is-zero .vd-count {
+  opacity: 0.35;
+}
+
+.vd-track {
+  display: flex;
+  align-items: flex-end;
+  width: 100%;
+  max-width: 36px;
+  height: 46px;
+  overflow: hidden;
+  border-bottom: 2px solid var(--ink);
+}
+
+.vd-bar {
+  width: 100%;
+  height: calc(var(--h) * 100%);
+  min-height: 0;
+  border: 2px solid var(--ink);
+  border-bottom: 0;
+  border-radius: 7px 7px 0 0;
+  background: var(--bar);
+  animation: bar-rise 0.6s var(--ease-out) both;
+  animation-delay: calc(0.3s + var(--i) * 80ms);
+}
+
+.vd-col.is-zero .vd-bar {
+  display: none;
+}
+
+@keyframes bar-rise {
+  from {
+    transform: translateY(100%);
+  }
+}
+
+.vd-icon {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 2px solid var(--ink);
+  border-radius: 50%;
+  background: var(--rc, #fff);
+}
+
+/* small strip on the result cards */
+.vote-dist.is-compact {
+  gap: 4px;
+}
+
+.vote-dist.is-compact .vd-track {
+  max-width: none;
+  height: 18px;
+}
+
+.vote-dist.is-compact .vd-bar {
+  border-radius: 5px 5px 0 0;
+  animation-delay: calc(var(--reveal-delay, 0.3s) + var(--i) * 50ms);
+}
+
+.vote-dist.is-compact .vd-count {
+  font-size: 0.72rem;
+}
+
+/* --- scores -------------------------------------------------------------- */
+.scores-phase {
+  --result-h: 240px;
+}
+
+.results-col {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+  min-width: 0;
+}
+
+.results-col .reveal-title {
+  margin: 0;
+}
+
+.scores-phase .result-grid:focus-visible {
+  outline: 3px solid var(--yellow);
+  outline-offset: 4px;
+  border-radius: 12px;
+}
+
+.scores-phase .result-card {
+  animation: card-in var(--dur-slow) var(--ease-spring) both;
+  animation-delay: calc(var(--i, 0) * 70ms);
+}
+
+@keyframes card-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.92);
+  }
+}
+
+.scores-phase .result-card.is-top {
+  box-shadow:
+    var(--shadow),
+    var(--glow-yellow);
+}
+
+.scores-phase .ribbon {
+  animation: ribbon-in 0.6s var(--ease-spring) both;
+  animation-delay: var(--reveal-delay, 0.3s);
+}
+
+@keyframes ribbon-in {
+  from {
+    opacity: 0;
+    transform: scale(0.2) rotate(-60deg);
+  }
+}
+
+.result-from {
+  display: flex;
+}
+
+.result-from svg {
+  flex: none;
+}
+
+.result-from-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.assist-chip {
+  flex: none;
+  margin-left: auto;
+  padding: 0 8px;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  background: var(--green);
+  color: var(--ink);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.leaderboard li {
+  animation: fade-up var(--dur-slow) var(--ease-out) both;
+  animation-delay: calc(var(--i, 0) * 50ms);
+}
+
+.lb-delta {
+  animation: badge-pop 0.5s var(--ease-spring) both;
+  animation-delay: calc(0.3s + var(--i, 0) * 50ms);
+}
+
+.next-in {
+  font-variant-numeric: tabular-nums;
+}
+
+.leftover {
+  display: grid;
+  gap: 8px;
+}
+
+.leftover-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0 0;
+  color: #fff;
+  font-size: 1.1rem;
+}
+
+.leftover-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.leftover-list li {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  width: 76px;
+  color: var(--muted-on-dark);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.leftover-list .media-thumb {
+  width: 76px;
+}
+
+.leftover-list li > span:last-child {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* --- final ---------------------------------------------------------------- */
+.final-phase .podium-spot {
+  animation: podium-rise 0.7s var(--ease-spring) both;
+}
+
+.final-phase .place-3 {
+  animation-delay: 0.2s;
+}
+
+.final-phase .place-2 {
+  animation-delay: 0.8s;
+}
+
+.final-phase .place-1 {
+  animation-delay: 1.4s;
+}
+
+@keyframes podium-rise {
+  from {
+    opacity: 0;
+    transform: translateY(70px) scale(0.9);
+  }
+}
+
+.final-phase .winner-line {
+  animation: winner-in 0.7s var(--ease-spring) both;
+  animation-delay: 1.8s;
+}
+
+@keyframes winner-in {
+  from {
+    opacity: 0;
+    transform: scale(0.5) rotate(-4deg);
+  }
+  60% {
+    transform: scale(1.12) rotate(1deg);
+  }
+}
+
+.podium-avatar {
+  position: relative;
+  display: inline-grid;
+}
+
+.final-phase .place-1 .podium-avatar .avatar {
+  box-shadow: var(--glow-yellow);
+}
+
+.podium-crown {
+  position: absolute;
+  top: -27px;
+  left: 50%;
+  margin-left: -15px;
+  color: var(--yellow);
+  filter: drop-shadow(0 2px 0 var(--ink));
+  animation: crown-drop 0.7s var(--ease-spring) both;
+  animation-delay: 2s;
+}
+
+@keyframes crown-drop {
+  from {
+    opacity: 0;
+    transform: translateY(-46px) rotate(-30deg);
+  }
+}
+
+.final-phase .rest-list {
+  animation: fade-up 0.5s var(--ease-out) both;
+  animation-delay: 2s;
+}
+
+.rest-list .rank {
+  flex: none;
+}
+
+.awards {
+  margin: 22px 0 8px;
+  animation: fade-up 0.5s var(--ease-out) both;
+  animation-delay: 2.3s;
+}
+
+.awards-title {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.award-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.award-card {
+  display: grid;
+  align-content: start;
+  justify-items: center;
+  flex: 0 1 200px;
+  gap: 4px;
+  min-width: 0;
+  padding: 14px 10px 12px;
+  border: var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: var(--shadow);
+  text-align: center;
+  animation: award-in 0.55s var(--ease-spring) both;
+  animation-delay: calc(2.5s + var(--i, 0) * 0.16s);
+}
+
+@keyframes award-in {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.6) rotate(-5deg);
+  }
+}
+
+.award-icon {
+  display: grid;
+  place-items: center;
+  width: 50px;
+  height: 50px;
+  border: var(--border);
+  border-radius: 50%;
+  background: var(--yellow);
+  box-shadow: 0 3px 0 var(--ink);
+}
+
+.award-on_fire .award-icon {
+  background: var(--orange);
+}
+
+.award-crowd .award-icon {
+  background: var(--pink);
+}
+
+.award-best_avg .award-icon,
+.award-one_shot .award-icon {
+  background: var(--cyan);
+}
+
+.award-supplier .award-icon {
+  background: var(--green);
+}
+
+.award-title {
+  font-size: 1.05rem;
+  line-height: 1.15;
+}
+
+.award-who {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  font-weight: 600;
+}
+
+.award-who > span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.award-value {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.final-rest {
+  animation: fade-up 0.6s var(--ease-out) both;
+  animation-delay: 3.2s;
+}
+
+/* reconnect / late arrival: the finished picture, no replay */
+.final-phase.is-settled .podium-spot,
+.final-phase.is-settled .winner-line,
+.final-phase.is-settled .podium-crown,
+.final-phase.is-settled .rest-list,
+.final-phase.is-settled .awards,
+.final-phase.is-settled .award-card,
+.final-phase.is-settled .final-rest {
+  animation: none;
+}
+
+/* --- phones ----------------------------------------------------------------- */
+@media (max-width: 900px) {
+  .how-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 44px;
+    color: var(--muted);
+  }
+
+  .swap-side .swap-illu,
+  .swap-side .swap-how-wrap {
+    display: none;
+  }
+
+  .swap-side.is-open .swap-how-wrap,
+  .is-ending .swap-side .swap-illu {
+    display: block;
+  }
+
+  .is-ending .swap-side .swap-illu {
+    display: flex;
+  }
+
+  .swap-side {
+    gap: 4px;
+  }
+}
+
+@media (max-width: 720px) {
+  .phase-head {
+    gap: 6px 12px;
+    margin-bottom: 10px;
+  }
+
+  .phase-head h1 {
+    font-size: 1.5rem;
+  }
+
+  .phase-sub {
+    overflow: hidden;
+    font-size: 0.9rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .phase-head > div:first-child {
+    flex: 1;
+    min-width: 0;
+  }
+
+  /* mid-game the site navigation makes room for the meme (logo and language stay) */
+  body:has(.room.is-playing) .main-nav {
+    display: none;
+  }
+
+  /* slim clock next to the headline; phases with an action bar show it down there */
+  .phase-head {
+    flex-wrap: nowrap;
+    align-items: center;
+  }
+
+  .scores-phase .phase-head {
+    flex-wrap: wrap;
+  }
+
+  .phase-head .timer {
+    flex: none;
+    flex-direction: column;
+    gap: 4px;
+    width: auto;
+  }
+
+  .phase-head .timer .timer-num {
+    min-width: 42px;
+    height: 42px;
+    font-size: 1.1rem;
+    border-width: 2px;
+    box-shadow: 0 3px 0 var(--ink);
+  }
+
+  .phase-head .timer-bar {
+    flex: none;
+    width: 42px;
+    height: 7px;
+    border-width: 2px;
+  }
+
+  .has-bar .phase-head .timer {
+    display: none;
+  }
+
+  /* the strip: one row that scrolls sideways, never wraps into the game */
+  .player-strip {
+    margin-bottom: 8px;
+    padding: 2px 0 2px 8px;
+  }
+
+  .strip-player {
+    min-height: 36px;
+  }
+
+  .strip-avatar .avatar {
+    --size: 28px !important;
+  }
+
+  .strip-list {
+    flex-wrap: nowrap;
+    gap: 12px;
+    width: 100%;
+    padding: 2px 26px 6px 2px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 26px), transparent);
+    mask-image: linear-gradient(90deg, #000 calc(100% - 26px), transparent);
+  }
+
+  .strip-list::-webkit-scrollbar {
+    display: none;
+  }
+
+  .strip-name {
+    max-width: 5.5em;
+    font-size: 0.85rem;
+  }
+
+  .strip-score {
+    padding: 0 6px;
+    font-size: 0.85rem;
+  }
+
+  /* action bar: the primary action is always in reach */
+  .action-bar {
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 45;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px calc(8px + var(--saib, env(safe-area-inset-bottom, 0px)));
+    border-top: 2px solid var(--glass-border);
+    background: var(--glass-bg-strong);
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+    backdrop-filter: blur(var(--glass-blur));
+    /* lifted above the on-screen keyboard (--kb is set from the visual viewport) */
+    transform: translateY(calc(-1 * var(--kb, 0px)));
+    animation: bar-in var(--dur-slow) var(--ease-out) backwards;
+  }
+
+  @keyframes bar-in {
+    from {
+      opacity: 0;
+      translate: 0 100%;
+    }
+  }
+
+  .action-bar-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: none;
+    color: #fff;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .action-bar-main {
+    display: flex;
+    flex: 1;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .action-bar .btn {
+    flex: 1;
+    min-width: 0;
+    min-height: 48px;
+    padding: 6px 12px;
+    font-size: 1.05rem;
+    box-shadow: var(--shadow-sm);
+  }
+
+  html.has-action-bar body {
+    padding-bottom: calc(66px + var(--saib, env(safe-area-inset-bottom, 0px)));
+  }
+
+  html.has-action-bar .toast {
+    bottom: calc(78px + var(--kb, 0px) + var(--saib, env(safe-area-inset-bottom, 0px)));
+  }
+
+  .has-bar .desktop-action {
+    display: none !important;
+  }
+
+  /* caption */
+  .caption-phase {
+    --stage-h: min(42vh, 360px);
+  }
+
+  .caption-phase .editor {
+    gap: 12px;
+  }
+
+  .caption-phase .editor-panel {
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .more-toggle {
+    display: inline-flex;
+    align-items: center;
+    align-self: flex-start;
+    gap: 6px;
+    min-height: 44px;
+    color: var(--muted);
+  }
+
+  .caption-extra {
+    display: none;
+  }
+
+  .caption-extra.is-open {
+    display: grid;
+  }
+
+  .caption-input textarea {
+    scroll-margin: 230px 0 100px;
+  }
+
+  /* keyboard open: the meme shrinks and stays on screen above the text box */
+  html.kb-open .caption-phase {
+    --stage-h: min(24vh, 190px);
+  }
+
+  html.kb-open .caption-phase .editor-stage {
+    position: sticky;
+    top: 4px;
+    z-index: 6;
+  }
+
+  .hunt-start {
+    min-height: 0;
+    padding: 18px 14px;
+  }
+
+  .hunt-start .hunt-badge {
+    width: 60px;
+    height: 60px;
+  }
+
+  .hunt-start .hunt-badge svg {
+    width: 28px;
+    height: 28px;
+  }
+
+  .hunt-start .hunt-form {
+    flex-direction: row;
+  }
+
+  .hunt-start .hunt-form .btn span {
+    display: none;
+  }
+
+  .hunt-again .hunt-lucky span {
+    display: none;
+  }
+
+  .hand-duo .hand-tile {
+    aspect-ratio: 2 / 1;
+  }
+
+  /* bring */
+  .upload-phase {
+    --stage-h: min(32vh, 280px);
+  }
+
+  .swap-tabs button {
+    padding: 7px 8px;
+    font-size: 0.92rem;
+  }
+
+  .swap-search .hunt-form {
+    flex-direction: row;
+  }
+
+  .swap-search .hunt-form .btn span {
+    display: none;
+  }
+
+  .swap-results {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    max-height: 44vh;
+  }
+
+  .swap-panel {
+    min-height: 200px;
+  }
+
+  /* vote: meme on top, rating in the thumb zone */
+  .vote-phase {
+    /* what is left between the head and the rating dock */
+    --stage-h: max(170px, min(46vh, 100dvh - 440px));
+  }
+
+  .vote-meta {
+    min-height: 32px;
+    margin-top: 6px;
+    font-size: 0.85rem;
+  }
+
+  .vote-dock {
+    position: sticky;
+    bottom: 0;
+    z-index: 20;
+    gap: 8px;
+    min-height: 196px;
+    margin: 6px -16px 0;
+    padding: 10px 12px calc(8px + var(--saib, env(safe-area-inset-bottom, 0px)));
+    border-top: 2px solid var(--glass-border);
+    background: var(--glass-bg-strong);
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+    backdrop-filter: blur(var(--glass-blur));
+  }
+
+  .vote-phase {
+    margin-bottom: -40px;
+  }
+
+  .vote-status {
+    margin-top: 6px;
+  }
+
+  .vote-yours {
+    min-height: 84px;
+    font-size: 1rem;
+  }
+
+  .reveal {
+    gap: 6px 12px;
+    padding: 10px 12px;
+  }
+
+  .reveal-score {
+    min-width: 96px;
+  }
+
+  .reveal-points {
+    font-size: 1.6rem;
+  }
+
+  .vd-track {
+    height: 34px;
+  }
+
+  .reveal .reveal-mystery {
+    display: none;
+  }
+
+  /* scores: memes as a carousel (winner first), the leaderboard right below */
+  .scores-phase {
+    --result-h: min(24vh, 190px);
+  }
+
+  .scores-phase .result-card {
+    gap: 6px;
+    padding: 8px;
+  }
+
+  .scores-phase .scores-layout {
+    gap: 12px;
+  }
+
+  .scores-phase .result-grid {
+    display: flex;
+    gap: 12px;
+    margin: -6px -16px 0;
+    padding: 20px 16px 10px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+  }
+
+  .scores-phase .result-grid::-webkit-scrollbar {
+    display: none;
+  }
+
+  .scores-phase .result-card {
+    flex: 0 0 min(80%, 300px);
+    scroll-snap-align: center;
+  }
+
+  .scores-phase .result-card:only-child {
+    flex-basis: 100%;
+  }
+
+  .scores-phase .leaderboard {
+    padding: 12px;
+  }
+
+  .scores-phase .leaderboard h2 {
+    margin-bottom: 8px;
+    font-size: 1.1rem;
+  }
+
+  .scores-phase .leaderboard ol {
+    gap: 5px;
+  }
+
+  .scores-phase .leaderboard li {
+    padding: 3px 8px;
+  }
+
+  .scores-phase .leaderboard .avatar {
+    --size: 28px !important;
+  }
+
+  .next-info {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  /* final */
+  .award-row {
+    gap: 10px;
+  }
+
+  .award-card {
+    flex: 0 1 calc(50% - 5px);
+    padding: 10px 6px;
+  }
+
+  .award-icon {
+    width: 42px;
+    height: 42px;
+  }
+
+  .award-title {
+    font-size: 0.95rem;
+  }
+}
+
+/* low frames (Discord Activity tile, landscape phones): keep meme and controls on one screen */
+@media (max-height: 620px) and (min-width: 721px) {
+  .caption-phase {
+    --stage-h: max(200px, 100vh - 250px);
+  }
+
+  .vote-phase {
+    --stage-h: max(180px, 100vh - 420px);
+  }
+
+  .vote-dock {
+    min-height: 230px;
+  }
+
+  .phase-head {
+    margin-bottom: 8px;
+  }
+
+  .player-strip {
+    margin-bottom: 8px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* the staged entrances are skipped completely: no waiting for a delay */
+  .phase-stage,
+  .final-phase *,
+  .scores-phase *,
+  .vote-phase *,
+  .action-bar {
+    animation-delay: 0s !important;
+  }
+}

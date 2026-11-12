@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { GAME_MODES, SETTING_OPTIONS, gameAllowed, sanitizeName } from '@/lib/shared';
 import { MASK, copyText } from '@/lib/streamer';
 import { usePublicInfo } from '@/lib/usePublicInfo';
+import ActionBar from './game/ActionBar';
 import Avatar from './Avatar';
 import { useActivity } from './ActivityContext';
 import AvatarPicker from './AvatarPicker';
@@ -166,15 +167,28 @@ function PrivateLobby({ game }) {
   const host = state.players.find((p) => p.id === state.hostId);
   const enough = connected.length >= state.minPlayers;
   const starting = state.phase === 'starting';
-  const hunt = state.settings.game === 'hunt';
+  // a tapped setting shows at once; the server state confirms (or corrects) it
+  const [pending, setPending] = useState(null);
+  const settingsKey = JSON.stringify(state.settings);
+  useEffect(() => setPending(null), [settingsKey]);
+  const settings = pending && isHost ? { ...state.settings, ...pending } : state.settings;
+  const gameId = state.settings.game;
+  const hunt = gameId === 'hunt';
   const pack = state.settings.pack;
+  // GIF Hunt: 0 = the server default
+  const searches = state.settings.searches || info.huntSearches;
+  const locked = !isHost || starting;
 
   useEffect(() => {
     setLink(`${window.location.origin}/room/${state.code}`);
     setCanShare(typeof navigator.share === 'function' && /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent));
   }, [state.code]);
 
-  const change = (name, value) => send({ t: 'settings', settings: { ...state.settings, [name]: value } });
+  const change = (name, value) => {
+    if (!send({ t: 'settings', settings: { ...state.settings, [name]: value } })) return;
+    // a new game mode brings its own defaults - wait for the server there
+    if (name !== 'game') setPending((p) => ({ ...p, [name]: value }));
+  };
 
   async function copy(what) {
     await copyText(what === 'code' ? state.code : link);
@@ -195,7 +209,7 @@ function PrivateLobby({ game }) {
   const secs = (n) => t('lobby.seconds', { n });
 
   return (
-    <div className="lobby">
+    <div className={`lobby ${isHost ? 'has-bar' : ''}`}>
       <div className="lobby-main">
       {activity ? (
         <DiscordInvite />
@@ -256,21 +270,34 @@ function PrivateLobby({ game }) {
                 aria-checked={state.settings.game === g.id}
                 className={`game-switch-btn ${state.settings.game === g.id ? 'on' : ''}`}
                 style={{ '--game': g.color }}
-                disabled={!isHost || starting}
+                disabled={locked}
                 onClick={() => change('game', g.id)}
               >
                 <span className="gs-icon">
                   <Icon name={g.icon} size={22} />
                 </span>
                 <span className="gs-text">
-                  <strong>{t(`games.${g.id}`)}</strong>
-                  <small>{t(`games.${g.id}.text`, { n: info.huntSearches })}</small>
+                  <strong>
+                    {t(`games.${g.id}`)}
+                    {g.beta && <span className="beta-chip">{t('games.beta')}</span>}
+                  </strong>
+                  <small>{t(`games.${g.id}.text`, { n: searches })}</small>
                 </span>
               </button>
             ))}
           </div>
         </div>
-        {state.settings.game !== 'classic' ? (
+        {gameId === 'swap' && connected.length < 3 && (
+          <p className="small mode-note">
+            <Icon name="users" size={16} /> {t('lobby.swapPlayers')}
+          </p>
+        )}
+        {gameId === 'same' && (
+          <p className="small mode-note">
+            <Icon name="copy" size={16} /> {t('lobby.sameHint')}
+          </p>
+        )}
+        {gameId === 'hunt' || gameId === 'swap' ? (
           <p className="muted small pack-hint">
             <Icon name="package" size={16} /> {t(hunt ? 'lobby.pack.huntHint' : 'lobby.pack.swapHint')}
           </p>
@@ -300,58 +327,69 @@ function PrivateLobby({ game }) {
         <SettingRow
           label={t('lobby.mode')}
           name="mode"
-          value={state.settings.mode}
+          value={settings.mode}
           options={SETTING_OPTIONS.mode}
           format={(o) => t(`lobby.mode.${o}`)}
-          disabled={!isHost || starting}
+          disabled={locked}
           onChange={change}
         />
-        <SettingRow label={t('lobby.rounds')} name="rounds" value={state.settings.rounds} options={SETTING_OPTIONS.rounds} disabled={!isHost || starting} onChange={change} />
+        <SettingRow label={t('lobby.rounds')} name="rounds" value={settings.rounds} options={SETTING_OPTIONS.rounds} disabled={locked} onChange={change} />
         <SettingRow
           label={t('lobby.captionTime')}
           name="captionTime"
-          value={state.settings.captionTime}
+          value={settings.captionTime}
           options={SETTING_OPTIONS.captionTime}
           format={secs}
-          disabled={!isHost || starting}
+          disabled={locked}
           onChange={change}
         />
         <SettingRow
           label={t('lobby.voteTime')}
           name="voteTime"
-          value={state.settings.voteTime}
+          value={settings.voteTime}
           options={SETTING_OPTIONS.voteTime}
           format={secs}
-          disabled={!isHost || starting}
+          disabled={locked}
           onChange={change}
         />
-        {state.settings.game === 'swap' && (
+        {hunt && (
           <SettingRow
-            label={t('lobby.uploadTime')}
-            name="uploadTime"
-            value={state.settings.uploadTime}
-            options={SETTING_OPTIONS.uploadTime}
-            format={secs}
-            disabled={!isHost || starting}
+            label={t('lobby.searches')}
+            name="searches"
+            value={settings.searches}
+            options={SETTING_OPTIONS.searches}
+            format={(o) => (o === 0 ? t('lobby.searches.auto', { n: info.huntSearches }) : o)}
+            disabled={locked}
             onChange={change}
           />
         )}
-        {state.settings.game === 'classic' && (
+        {gameId === 'swap' && (
+          <SettingRow
+            label={t('lobby.uploadTime')}
+            name="uploadTime"
+            value={settings.uploadTime}
+            options={SETTING_OPTIONS.uploadTime}
+            format={secs}
+            disabled={locked}
+            onChange={change}
+          />
+        )}
+        {gameId === 'classic' && (
           <SettingRow
             label={t('lobby.rerolls')}
             name="rerolls"
-            value={state.settings.rerolls}
+            value={settings.rerolls}
             options={SETTING_OPTIONS.rerolls}
-            disabled={!isHost || starting}
+            disabled={locked}
             onChange={change}
           />
         )}
         <SettingRow
           label={t('lobby.maxPlayers')}
           name="maxPlayers"
-          value={state.settings.maxPlayers}
+          value={settings.maxPlayers}
           options={SETTING_OPTIONS.maxPlayers}
-          disabled={!isHost || starting}
+          disabled={locked}
           onChange={change}
         />
       </section>
@@ -422,7 +460,7 @@ function PrivateLobby({ game }) {
       <div className="card start-bar">
         {isHost ? (
           <>
-            <button type="button" className="btn btn-yellow btn-big" disabled={!enough || starting} onClick={() => send({ t: 'start' })}>
+            <button type="button" className="btn btn-yellow btn-big desktop-action" disabled={!enough || starting} onClick={() => send({ t: 'start' })}>
               {starting ? (
                 t('lobby.starting')
               ) : (
@@ -441,6 +479,21 @@ function PrivateLobby({ game }) {
         )}
       </div>
       </div>
+      {isHost && (
+        <ActionBar info={t('lobby.playersShort', { n: connected.length })}>
+          <button type="button" className="btn btn-yellow btn-block" disabled={!enough || starting} onClick={() => send({ t: 'start' })}>
+            {starting ? (
+              t('lobby.starting')
+            ) : enough ? (
+              <>
+                <Icon name="play" size={18} /> {t('lobby.start')}
+              </>
+            ) : (
+              t('lobby.needPlayers', { n: state.minPlayers })
+            )}
+          </button>
+        </ActionBar>
+      )}
       {editing && <ProfileEditor onClose={() => setEditing(false)} />}
       {reportDialog}
       {picking && <PackPicker current={pack} onPick={(id) => send({ t: 'pack', id })} onClose={() => setPicking(false)} />}

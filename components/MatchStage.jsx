@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { GAME_MODES } from '@/lib/shared';
 import Avatar from './Avatar';
 import Icon from './Icon';
 import LolLogo from './LolLogo';
@@ -39,7 +40,7 @@ export default function MatchStage({ title, game, players = [], slots = 0, progr
       </h1>
       {game && (
         <span className={`mm-game game-${game}`}>
-          <Icon name={game === 'hunt' ? 'search' : 'image'} size={16} /> {t(`games.${game}`)}
+          <Icon name={GAME_MODES.find((g) => g.id === game)?.icon || 'image'} size={16} /> {t(`games.${game}`)}
         </span>
       )}
 

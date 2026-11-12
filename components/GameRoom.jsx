@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { sanitizeName } from '@/lib/shared';
 import { MASK, rememberRoom, syncRoomUrl } from '@/lib/streamer';
 import { useGameSocket } from '@/lib/useGameSocket';
@@ -168,6 +168,25 @@ export default function GameRoom({ code }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile?.name, profile?.avatar]);
 
+  // a new phase: back to the top, and keyboard / screen reader users land on its headline
+  // (unless the phase put the focus somewhere itself, e.g. into the search box)
+  const stage = useRef(null);
+  const lastPhase = useRef(null);
+  const phase = state ? (state.phase === 'starting' ? 'lobby' : state.phase) : null;
+  useEffect(() => {
+    const before = lastPhase.current;
+    lastPhase.current = phase;
+    if (!phase || !before || before === phase) return;
+    window.scrollTo(0, 0);
+    const el = stage.current;
+    if (!el || el.contains(document.activeElement)) return;
+    const head = el.querySelector('h1');
+    if (head) {
+      head.setAttribute('tabindex', '-1');
+      head.focus({ preventScroll: true });
+    }
+  }, [phase]);
+
   if (!profile || accountLoading) return <div className="page-center">{t('common.loading')}</div>;
   if (!ready) return <NameGate code={code} onDone={() => setReady(true)} />;
   if (fatal) return <Fatal code={fatal} info={fatalInfo} />;
@@ -199,10 +218,17 @@ export default function GameRoom({ code }) {
   })();
 
   return (
-    <div className={`room phase-${state.phase}`}>
+    <div className={`room phase-${state.phase} ${['upload', 'caption', 'vote', 'scores'].includes(state.phase) ? 'is-playing' : ''}`}>
       {status !== 'open' && <div className="conn-banner">{t('common.reconnecting')}</div>}
       {state.phase !== 'lobby' && state.phase !== 'starting' && <PlayerStrip state={state} game={game} />}
-      {phaseView}
+      <p className="sr-only" aria-live="polite">
+        {t(`phase.${phase}`)}
+        {state.round > 0 && phase !== 'final' ? ` – ${t('common.round', { n: state.round, total: state.settings.rounds })}` : ''}
+      </p>
+      {/* keyed: every phase slides in once (transform and opacity only) */}
+      <div className="phase-stage" key={phase} ref={stage}>
+        {phaseView}
+      </div>
       <Toast notice={notice} minPlayers={state.minPlayers} />
     </div>
   );

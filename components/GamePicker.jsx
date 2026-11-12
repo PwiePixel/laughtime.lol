@@ -6,7 +6,7 @@ import { usePublicInfo } from '@/lib/usePublicInfo';
 import Icon from './Icon';
 import { useApp } from './Providers';
 
-/** Small game selection window: Classic or GIF Hunt. */
+/** Small game selection window: the modes of this release channel (quick play: public ones only). */
 export default function GamePicker({ purpose = 'quick', busy = null, onPick, onClose }) {
   const { t, channel } = useApp();
   const info = usePublicInfo();
@@ -48,9 +48,13 @@ export default function GamePicker({ purpose = 'quick', busy = null, onPick, onC
                 <Icon name={g.icon} size={44} strokeWidth={2.4} />
                 {g.id === 'hunt' && <span className="game-art-gif">GIF</span>}
                 {g.id === 'swap' && <span className="game-art-gif">UPLOAD</span>}
+                {g.id === 'same' && <span className="game-art-gif">1 = ALL</span>}
               </span>
               <span className="game-body">
-                <strong>{t(`games.${g.id}`)}</strong>
+                <strong>
+                  {t(`games.${g.id}`)}
+                  {g.beta && <span className="beta-chip">{t('games.beta')}</span>}
+                </strong>
                 <span>{t(`games.${g.id}.text`, { n: info.huntSearches })}</span>
                 {purpose === 'quick' && info[g.id]?.players > 0 && (
                   <span className="game-online">
