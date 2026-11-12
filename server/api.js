@@ -28,6 +28,7 @@ import { getConfig } from './config.js';
 import { isAdmin as isAdminUser } from './accounts.js';
 import { handleActivityApi, isActivityRequest } from './activity.js';
 import { HttpError, checkOrigin, clientIp, createLimiter, isHttps, json, parseCookies, readJson, redirect, serializeCookie } from './http.js';
+import { apiCache } from './lib/respond.js';
 import { browseMedia, cleanQuery, isBlocked, searchMedia } from './media/search.js';
 import { addPackItem, addPackUpload, createPack, deletePack, getPack, listPacks, listReviews, removePackItem, reviewPack, updatePack } from './packs.js';
 import { readUpload } from './uploads.js';
@@ -289,7 +290,11 @@ async function studioSearch(res, ctx, q) {
 async function packRoutes(req, res, ctx, p, method, q) {
   if (p === '/api/packs' && method === 'GET') {
     const scope = q.get('scope') === 'mine' ? 'mine' : 'public';
-    json(res, 200, listPacks({ scope, viewer: ctx.user, q: q.get('q') || '', limit: q.get('limit'), offset: q.get('offset') }));
+    const list = () => listPacks({ scope, viewer: ctx.user, q: q.get('q') || '', limit: q.get('limit'), offset: q.get('offset') });
+    // the public list looks the same for every guest: cached for a moment (never for accounts)
+    if (scope === 'public' && !ctx.user) {
+      apiCache.send(req, res, `packs:${q.get('q') || ''}:${q.get('limit')}:${q.get('offset')}`, 10_000, list, { cacheControl: 'private, no-cache' });
+    } else json(res, 200, list());
     return true;
   }
   if (p === '/api/packs' && method === 'POST') {
@@ -511,17 +516,19 @@ export async function handleApi(req, res, url) {
 
     // --- public data ---
     if (p === '/api/leaderboard' && method === 'GET') {
-      json(res, 200, {
-        metric: q.get('metric') || 'points',
-        period: q.get('period') || 'all',
-        rows: leaderboard(q.get('metric') || 'points', q.get('period') || 'all', Math.min(100, Number(q.get('limit')) || 50)),
-      });
+      const metric = q.get('metric') || 'points';
+      const period = q.get('period') || 'all';
+      const limit = Math.min(100, Number(q.get('limit')) || 50);
+      // the same for everybody: computed at most every 15 s (and again after new results)
+      apiCache.send(req, res, `leaderboard:${metric}:${period}:${limit}`, 15_000, () => ({
+        metric,
+        period,
+        rows: leaderboard(metric, period, limit),
+      }));
       return true;
     }
     if (p === '/api/memes' && method === 'GET') {
-      json(
-        res,
-        200,
+      const list = () =>
         listMemes({
           sort: q.get('sort') || 'top',
           period: q.get('period') || 'all',
@@ -529,8 +536,12 @@ export async function handleApi(req, res, url) {
           viewer: ctx.user,
           limit: q.get('limit'),
           offset: q.get('offset'),
-        }),
-      );
+        });
+      // guests all see the same list; with an account it contains "liked by me" and is never cached
+      if (!ctx.user) {
+        const key = `memes:${q.get('sort')}:${q.get('period')}:${q.get('user')}:${q.get('limit')}:${q.get('offset')}`;
+        apiCache.send(req, res, key, 10_000, list, { cacheControl: 'private, no-cache' });
+      } else json(res, 200, list());
       return true;
     }
     const memeMatch = /^\/api\/memes\/([A-Za-z0-9_-]{6,20})(\/like)?$/.exec(p);
@@ -560,11 +571,14 @@ export async function handleApi(req, res, url) {
     }
     if (p.startsWith('/api/packs') && (await packRoutes(req, res, ctx, p, method, q))) return true;
     if (p === '/api/community' && method === 'GET') {
-      json(res, 200, {
+      // shown on the start page: the parts that are the same for everybody are computed at most every 15 s
+      const shared = apiCache.value('community', 15_000, () => ({
         stats: siteStats(),
         topPlayers: leaderboard('points', 'week', 5),
-        topMemes: listMemes({ sort: 'top', period: 'week', viewer: ctx.user, limit: 4 }).items,
-      });
+        topMemes: listMemes({ sort: 'top', period: 'week', viewer: null, limit: 4 }).items,
+      }));
+      // with an account the memes carry "liked by me": always fresh, never from the cache
+      json(res, 200, ctx.user ? { ...shared, topMemes: listMemes({ sort: 'top', period: 'week', viewer: ctx.user, limit: 4 }).items } : shared);
       return true;
     }
     return false;

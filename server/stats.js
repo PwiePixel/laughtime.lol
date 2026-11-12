@@ -1,6 +1,7 @@
 import { isAdmin, publicUser } from './accounts.js';
 import { all, get, newId, run, transaction } from './db.js';
 import { HttpError } from './http.js';
+import { apiCache } from './lib/respond.js';
 import { proxyUrl } from './proxy.js';
 import { activeSanction } from './moderation.js';
 
@@ -52,6 +53,7 @@ export function saveWinningMeme({ userId, media, captions, points, avg, votes, p
     players,
     Date.now(),
   );
+  apiCache.invalidate(); // gallery lists and counters changed
   const show = get('SELECT show_memes FROM users WHERE id = ?', userId)?.show_memes;
   if (show && activeSanction({ userId })) {
     run('UPDATE memes SET hidden = 1 WHERE id = ?', id);
@@ -82,6 +84,7 @@ export function saveGameResults(rows, players) {
       );
     }
   });
+  apiCache.invalidate(); // leaderboards changed
   return valid.length;
 }
 
@@ -234,6 +237,7 @@ export function toggleLike(memeId, user) {
   );
   if (!meme) throw new HttpError(404, 'meme_not_found');
   if (meme.user_id === user.id) throw new HttpError(400, 'own_meme');
+  apiCache.invalidate(); // like counts are part of the cached lists
   return transaction(() => {
     const existing = get('SELECT 1 AS x FROM meme_likes WHERE meme_id = ? AND user_id = ?', meme.id, user.id);
     if (existing) {
@@ -253,5 +257,6 @@ export function deleteMeme(memeId, user) {
   if (!meme) throw new HttpError(404, 'meme_not_found');
   if (meme.user_id !== user.id && !isAdmin(user)) throw new HttpError(403, 'forbidden');
   run('DELETE FROM memes WHERE id = ?', meme.id);
+  apiCache.invalidate();
   return { ok: true };
 }

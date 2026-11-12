@@ -15,7 +15,9 @@ import { queueSizes } from './matchmaking.js';
 import { activeSanction, hashIp, purgeModeration, sampleMetrics } from './moderation.js';
 import { packForGame } from './packs.js';
 import { activeSourceNames, mediaStatus, pickMedia, startMediaPool } from './media/index.js';
+import { performanceStatus } from './media/status.js';
 import { handleMediaRequest, proxyUrl, sweepCache, warmMedia } from './proxy.js';
+import { apiCache, compressJson, invalidateAfterWrite } from './lib/respond.js';
 
 // One HTTP server for everything:
 //   /ws                -> WebSocket game server
@@ -77,9 +79,15 @@ export async function startServer({ dev = false, dir = ROOT } = {}) {
         return await handleMediaRequest(req, res, url.searchParams);
       }
       if (p.startsWith('/api/uploads/') && (req.method === 'GET' || req.method === 'HEAD')) {
-        // evidence copies of reported uploads: admins only
-        if (p.startsWith('/api/uploads/reports/') && !isAdmin(userFromRequest(req).user)) return json(res, 404, { error: 'not_found' });
+        // evidence copies of reported uploads (and their preview pictures): admins only
+        const evidence = p.startsWith('/api/uploads/reports/') || p.startsWith('/api/uploads/t/reports/');
+        if (evidence && !isAdmin(userFromRequest(req).user)) return json(res, 404, { error: 'not_found' });
         return await serveUpload(req, res, p.slice('/api/uploads/'.length));
+      }
+      if (p.startsWith('/api/')) {
+        // larger JSON answers are compressed; after a write the cached public answers are dropped
+        compressJson(req, res);
+        if (req.method !== 'GET' && req.method !== 'HEAD') res.once('finish', () => invalidateAfterWrite(p));
       }
       const roomUpload = /^\/api\/rooms\/([A-Z0-9]{5})\/upload$/.exec(p);
       if (roomUpload && req.method === 'POST') {
@@ -137,11 +145,13 @@ export async function startServer({ dev = false, dir = ROOT } = {}) {
         return json(res, 200, roomInfo(code));
       }
       if (p === '/api/status') {
-        return json(res, 200, { ok: true, uptime: Math.round(process.uptime()), ...stats(), queues: queueSizes(), media: mediaStatus() });
+        return json(res, 200, { ok: true, uptime: Math.round(process.uptime()), ...stats(), queues: queueSizes(), media: mediaStatus(), ...performanceStatus() });
       }
       if (p === '/api/public') {
-        return json(res, 200, {
-          channel: requestChannel(req),
+        // polled by every open page: computed at most every 2 s, per release channel (never shared between them)
+        const channel = requestChannel(req);
+        return apiCache.send(req, res, `public:${channel}`, 2000, () => ({
+          channel,
           classic: publicStats('classic'),
           hunt: publicStats('hunt'),
           queues: queueSizes(),
@@ -149,20 +159,23 @@ export async function startServer({ dev = false, dir = ROOT } = {}) {
           matchMin: cfg.matchMin,
           matchMax: cfg.matchMax,
           uploadMaxMb: Math.round(cfg.uploadMaxBytes / 1048576),
-        });
+        }), { cacheControl: 'private, no-cache' });
       }
       if (p === '/api/showcase') {
-        const used = new Set();
-        const items = ['image', 'video', 'image'].map((kind) => {
-          const m = pickMedia(kind, used);
-          used.add(m.id);
-          warmMedia(m.url);
-          return { kind: m.kind, src: proxyUrl(m.url), width: m.width, height: m.height, title: m.title };
+        // the same three examples for everybody for a few seconds
+        return apiCache.send(req, res, 'showcase', 15_000, () => {
+          const used = new Set();
+          const items = ['image', 'video', 'image'].map((kind) => {
+            const m = pickMedia(kind, used);
+            used.add(m.id);
+            warmMedia(m.url);
+            return { kind: m.kind, src: proxyUrl(m.url), width: m.width, height: m.height, title: m.title };
+          });
+          return { items };
         });
-        return json(res, 200, { items });
       }
       if (p === '/api/sources') {
-        return json(res, 200, { sources: activeSourceNames() });
+        return apiCache.send(req, res, 'sources', 30_000, () => ({ sources: activeSourceNames() }));
       }
       if (await handleApi(req, res, url)) return undefined;
       if (p.startsWith('/api/')) return json(res, 404, { error: 'not_found' });
@@ -181,7 +194,23 @@ export async function startServer({ dev = false, dir = ROOT } = {}) {
   const wss = new WebSocketServer({
     noServer: true,
     maxPayload: 32 * 1024,
-    perMessageDeflate: false,
+    // Per-message compression stays off by default. Measured with 8 players: a state
+    // message is 1.0–2.1 KB of JSON (0.4–0.7 KB deflated), a whole round adds up to
+    // about 110 KB per player – compression would save ~70 KB per round, less than a
+    // single meme picture. The price would be a zlib stream per socket and message
+    // (every tiny client message has to be inflated as well) and the memory
+    // fragmentation zlib is known for under many connections. Not a clear win.
+    // WS_COMPRESSION=true switches it on for hosts with expensive traffic, in the
+    // memory-safe form: no shared context between messages, small messages left alone.
+    perMessageDeflate: cfg.wsCompression
+      ? {
+          threshold: 1024,
+          serverNoContextTakeover: true,
+          clientNoContextTakeover: true,
+          zlibDeflateOptions: { level: 4, memLevel: 7 },
+          concurrencyLimit: 8,
+        }
+      : false,
     // the activity sends ["laughtime", "lt-auth.<session>"] – answer with the plain name only
     handleProtocols: (protocols) => (protocols.has('laughtime') ? 'laughtime' : false),
   });
