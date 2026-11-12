@@ -348,3 +348,182 @@ body:has(> .main .toast) .pwa-stack {
     width: 100%;
   }
 }
+
+/* --- 3. native feel on phones -------------------------------------------
+   The viewport covers the whole screen (viewport-fit=cover in app/layout.jsx),
+   so everything that touches an edge keeps out of the notch, the rounded
+   corners and the home indicator. Outside of such screens env() is 0. */
+html {
+  /* no grey flash when something is tapped – buttons have their own pressed state */
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* no 300 ms delay and no double-tap zoom on controls */
+a,
+button,
+input,
+select,
+textarea,
+label,
+summary,
+[role='button'] {
+  touch-action: manipulation;
+}
+
+.header {
+  padding-top: max(14px, calc(env(safe-area-inset-top, 0px) + 6px));
+}
+
+.header,
+.main,
+.footer {
+  padding-left: max(20px, env(safe-area-inset-left, 0px));
+  padding-right: max(20px, env(safe-area-inset-right, 0px));
+}
+
+.footer {
+  padding-bottom: max(26px, calc(env(safe-area-inset-bottom, 0px) + 14px));
+}
+
+/* dialogs: clear of notch and home indicator, never taller than the visible
+   screen (dvh shrinks while the browser bars or the keyboard are showing) */
+.modal-backdrop {
+  padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px))
+    max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+  overscroll-behavior: contain;
+}
+
+.modal {
+  max-height: calc(100dvh - 32px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* the game's own toast clears the home indicator already; the sticky
+   "reconnecting" banner must not hide below the status bar of the app */
+.conn-banner {
+  top: max(8px, env(safe-area-inset-top, 0px));
+}
+
+/* While a game is on screen (PwaBoot sets the attribute on /room and /play):
+   no pull-to-refresh and no rubber band – a stray swipe must not reload the round. */
+html[data-pwa-game],
+html[data-pwa-game] body {
+  overscroll-behavior-y: none;
+}
+
+/* grids with one "1fr" column grow with their widest child; minmax(0, …) keeps
+   long player names and codes inside the screen */
+.player-list {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.lobby-main,
+.lobby-side {
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+}
+
+@media (max-width: 960px) {
+  .lobby {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 720px) {
+  .header,
+  .main,
+  .footer {
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
+}
+
+/* Fingers instead of a mouse */
+@media (pointer: coarse) {
+  /* iOS zooms into every field with less than 16px text and never zooms back */
+  input,
+  select,
+  textarea {
+    font-size: max(16px, 1em);
+  }
+
+  .invite-link .input {
+    font-size: 16px;
+  }
+
+  /* comfortable touch targets (44px and up) */
+  .btn-small,
+  .chip,
+  .main-nav a,
+  .streamer-toggle:not(.is-compact) {
+    min-height: 44px;
+  }
+
+  .lang-switch button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .icon-grid {
+    grid-template-columns: repeat(auto-fill, minmax(44px, 1fr));
+  }
+
+  .tabs button,
+  .icon-btn {
+    min-height: 44px;
+  }
+
+  .icon-btn,
+  .chip {
+    min-width: 44px;
+  }
+
+  .reaction-bar button {
+    width: 44px;
+    height: 44px;
+  }
+
+  /* small round controls keep their look and get a bigger invisible touch area */
+  .swatch,
+  .streamer-toggle.is-compact {
+    position: relative;
+  }
+
+  .swatch::after,
+  .meme-download::after,
+  .sound-toggle::after,
+  .streamer-toggle.is-compact::after {
+    content: '';
+    position: absolute;
+    inset: -8px;
+    border-radius: inherit;
+  }
+}
+
+/* Installed app (own window without browser bars) */
+@media (display-mode: standalone), (display-mode: fullscreen), (display-mode: minimal-ui) {
+  /* navigation and buttons behave like app controls: no text selection,
+     no "open in new tab" sheet on a long press */
+  .header,
+  .footer,
+  .btn,
+  .chip,
+  .mode-tile,
+  .pwa-stack {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+
+  /* nothing to install any more */
+  .pwa-banner {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .offline-spin {
+    animation: none;
+  }
+}
