@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 620 300"><title>LoL – GeoTime</title>
+  <g class="geo-part geo-l1">
+    <path d="M40.0 84.0 Q40 62 62.0 62.0 L84.0 62.0 Q106 62 106.0 84.0 L106.0 172.0 Q106 194 128.0 194.0 L168.0 194.0 Q190 194 190.0 216.0 L190.0 236.0 Q190 258 168.0 258.0 L62.0 258.0 Q40 258 40.0 236.0 Z" transform="rotate(-8 115 160) translate(10 12)" fill="#170A2E" stroke="#170A2E" stroke-width="14" stroke-linejoin="round"/>
+    <path d="M40.0 84.0 Q40 62 62.0 62.0 L84.0 62.0 Q106 62 106.0 84.0 L106.0 172.0 Q106 194 128.0 194.0 L168.0 194.0 Q190 194 190.0 216.0 L190.0 236.0 Q190 258 168.0 258.0 L62.0 258.0 Q40 258 40.0 236.0 Z" transform="rotate(-8 115 160)" fill="#FFD23F" stroke="#170A2E" stroke-width="14" stroke-linejoin="round"/>
+    <path d="M56 88 V172" transform="rotate(-8 115 160)" stroke="#fff" stroke-opacity=".5" stroke-width="12" stroke-linecap="round"/>
+  </g>
+  <g class="geo-part geo-o">
+    <path d="M241.9 198.9 A76 76 0 1 1 358.1 198.9 L300 268 Z" transform="rotate(-5 300 160) translate(10 12)" fill="#170A2E" stroke="#170A2E" stroke-width="14" stroke-linejoin="round"/>
+    <g class="geo-pin"><g transform="rotate(-5 300 160)">
+        <path d="M241.9 198.9 A76 76 0 1 1 358.1 198.9 L300 268 Z" fill="#FF4FA3"/>
+        <path d="M249.6 106.8 A71.4 71.4 0 0 1 306.4 78.6" fill="none" stroke="#fff" stroke-opacity=".45" stroke-width="10" stroke-linecap="round"/>
+        <g transform="translate(300 147) scale(0.86) translate(-300 -173)">
+        <path d="M252.96 166.28 q16.8 -25.2 33.6 0" fill="none" stroke="#170A2E" stroke-width="14" stroke-linecap="round"/>
+        <path d="M313.44 166.28 q16.8 -25.2 33.6 0" fill="none" stroke="#170A2E" stroke-width="14" stroke-linecap="round"/>
+        <path d="M245 176 c-9 12 -14 22 -5.5 29 c8.6 5 17 -5 8.6 -29z" fill="#35E0FF" stroke="#170A2E" stroke-width="5" stroke-linejoin="round"/>
+        <path d="M355 176 c9 12 14 22 5.5 29 c-8.6 5 -17 -5 -8.6 -29z" fill="#35E0FF" stroke="#170A2E" stroke-width="5" stroke-linejoin="round"/>
+        <clipPath id="gt-mouth-mark"><path d="M255 186 H345 Q343.4 238 300 239.6 Q256.6 238 255 186Z"/></clipPath>
+        <g clip-path="url(#gt-mouth-mark)">
+          <rect x="220" y="175" width="160" height="84" fill="#170A2E"/>
+          <rect x="220" y="183" width="160" height="17" fill="#fff"/>
+          <ellipse cx="300" cy="239.6" rx="27" ry="19" fill="#FF9ACB"/>
+        </g>
+        <path d="M255 186 H345 Q343.4 238 300 239.6 Q256.6 238 255 186Z" fill="none" stroke="#170A2E" stroke-width="8" stroke-linejoin="round"/>
+      </g>
+        <path d="M241.9 198.9 A76 76 0 1 1 358.1 198.9 L300 268 Z" fill="none" stroke="#170A2E" stroke-width="14" stroke-linejoin="round"/>
+      </g></g>
+  </g>
+  <g class="geo-part geo-l2">
+    <path d="M414.0 84.0 Q414 62 436.0 62.0 L458.0 62.0 Q480 62 480.0 84.0 L480.0 172.0 Q480 194 502.0 194.0 L542.0 194.0 Q564 194 564.0 216.0 L564.0 236.0 Q564 258 542.0 258.0 L436.0 258.0 Q414 258 414.0 236.0 Z" transform="rotate(7 489 160) translate(10 12)" fill="#170A2E" stroke="#170A2E" stroke-width="14" stroke-linejoin="round"/>
+    <path d="M414.0 84.0 Q414 62 436.0 62.0 L458.0 62.0 Q480 62 480.0 84.0 L480.0 172.0 Q480 194 502.0 194.0 L542.0 194.0 Q564 194 564.0 216.0 L564.0 236.0 Q564 258 542.0 258.0 L436.0 258.0 Q414 258 414.0 236.0 Z" transform="rotate(7 489 160)" fill="#35E0FF" stroke="#170A2E" stroke-width="14" stroke-linejoin="round"/>
+    <path d="M430 88 V172" transform="rotate(7 489 160)" stroke="#fff" stroke-opacity=".5" stroke-width="12" stroke-linecap="round"/>
+  </g>
+  <path class="geo-star st1" d="M212 24 Q215.6 40.4 232 44 Q215.6 47.6 212 64 Q208.4 47.6 192 44 Q208.4 40.4 212 24Z" fill="#fff" stroke="#170A2E" stroke-width="5" stroke-linejoin="round"/>
+  <path class="geo-star st2" d="M392 36 Q394.52 47.48 406 50 Q394.52 52.52 392 64 Q389.48 52.52 378 50 Q389.48 47.48 392 36Z" fill="#FFD23F" stroke="#170A2E" stroke-width="5" stroke-linejoin="round"/>
+  <path class="geo-star st3" d="M574 234 Q576.88 247.12 590 250 Q576.88 252.88 574 266 Q571.12 252.88 558 250 Q571.12 247.12 574 234Z" fill="#35E0FF" stroke="#170A2E" stroke-width="5" stroke-linejoin="round"/>
+</svg>

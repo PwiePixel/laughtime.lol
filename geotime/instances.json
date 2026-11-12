@@ -1,0 +1,31 @@
+{
+  "_comment": [
+    "Instanzen von GeoTime.lol. Alles läuft im selben Pterodactyl-Docker-Container:",
+    "launch.js startet LaughTime (unverändert) und GeoTime production; Beta-Instanzen",
+    "kommen über den Instanz-Manager (CLI oder Discord /beta) dazu.",
+    "Ports müssen in Pterodactyl als zusätzliche Allocations eingetragen sein,",
+    "sonst sind sie von außen nicht erreichbar."
+  ],
+  "production": {
+    "id": "prod",
+    "channel": "production",
+    "portEnv": "PORT_GEOTIME",
+    "portFallback": 3001,
+    "dataDir": "data/prod",
+    "autoStart": true,
+    "restartOnCrash": true
+  },
+  "beta": {
+    "channel": "beta",
+    "portPoolEnv": "GEOTIME_BETA_PORTS",
+    "portPool": [3002, 3003, 3004],
+    "maxInstances": 3,
+    "dataDirPattern": "data/{id}",
+    "ttlMinutes": 240,
+    "restartOnCrash": false
+  },
+  "limits": {
+    "startTimeoutMs": 60000,
+    "stopTimeoutMs": 10000
+  }
+}

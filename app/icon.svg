@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" ><title>laughtime.lol</title>
+  <rect x="8" y="8" width="496" height="496" rx="112" fill="#2A1057"/><rect x="8" y="8" width="496" height="496" rx="112" fill="none" stroke="#170A2E" stroke-width="16"/>
+  <circle cx="262" cy="266" r="152" fill="#170A2E"/>
+  <g transform="translate(248 250) scale(1.8) translate(-300 -173)">
+    <circle cx="300" cy="173" r="84" fill="#FF4FA3"/>
+    <path d="M247.92000000000002 129.32 A71.39999999999999 71.39999999999999 0 0 1 308.4 100.76" fill="none" stroke="#fff" stroke-opacity=".45" stroke-width="10.08" stroke-linecap="round"/>
+    <path d="M252.95999999999998 166.28 q16.8 -25.2 33.6 0" fill="none" stroke="#170A2E" stroke-width="11.760000000000002" stroke-linecap="round"/>
+    <path d="M313.44 166.28 q16.8 -25.2 33.6 0" fill="none" stroke="#170A2E" stroke-width="11.760000000000002" stroke-linecap="round"/>
+    <path d="M242.04 174.68 c-8.4 11.760000000000002 -13.44 21.84 -5.04 28.560000000000002 c8.4 5.04 16.8 -5.04 8.4 -28.560000000000002z" fill="#35E0FF" stroke="#170A2E" stroke-width="4.2" stroke-linejoin="round"/>
+    <path d="M357.96000000000004 174.68 c8.4 11.760000000000002 13.44 21.84 5.04 28.560000000000002 c-8.4 5.04 -16.8 -5.04 -8.4 -28.560000000000002z" fill="#35E0FF" stroke="#170A2E" stroke-width="4.2" stroke-linejoin="round"/>
+    <clipPath id="mouth"><path d="M251.28 184.76 H348.72 Q347.04 241.88 300 243.56 Q252.95999999999998 241.88 251.28 184.76Z"/></clipPath>
+    <g clip-path="url(#mouth)">
+      <rect x="216" y="173" width="168" height="84" fill="#170A2E"/>
+      <rect x="216" y="181.4" width="168" height="16.8" fill="#fff"/>
+      <ellipse cx="300" cy="243.56" rx="28.560000000000002" ry="20.16" fill="#FF9ACB"/>
+    </g>
+    <path d="M251.28 184.76 H348.72 Q347.04 241.88 300 243.56 Q252.95999999999998 241.88 251.28 184.76Z" fill="none" stroke="#170A2E" stroke-width="6.72" stroke-linejoin="round"/>
+    <circle cx="300" cy="173" r="84" fill="none" stroke="#170A2E" stroke-width="14"/></g>
+  <path d="M414 64 Q421.2 96.8 454 104 Q421.2 111.2 414 144 Q406.8 111.2 374 104 Q406.8 96.8 414 64Z" fill="#FFD23F" stroke="#170A2E" stroke-width="10" stroke-linejoin="round"/></svg>

@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><title>geotime.lol</title>
+  <!-- App-Icon von GeoTime: die lachende Standort-Nadel aus dem Logo,
+       auf dem Bingo-Raster. Gleiche Designsprache wie LaughTime. -->
+  <rect x="8" y="8" width="496" height="496" rx="112" fill="#2A1057"/>
+  <g stroke="#C9B8EC" stroke-opacity=".3" stroke-width="12" stroke-linecap="round">
+    <path d="M8 182 H504 M8 330 H504 M182 8 V504 M330 8 V504"/>
+  </g>
+  <rect x="8" y="8" width="496" height="496" rx="112" fill="none" stroke="#170A2E" stroke-width="16"/>
+  <g transform="translate(256 262) scale(1.62) translate(-300 -176)">
+    <path d="M241.9 198.9 A76 76 0 1 1 358.1 198.9 L300 268 Z" transform="translate(8 10)" fill="#170A2E"/>
+    <path d="M241.9 198.9 A76 76 0 1 1 358.1 198.9 L300 268 Z" fill="#FF4FA3"/>
+    <path d="M249.6 106.8 A71.4 71.4 0 0 1 306.4 78.6" fill="none" stroke="#fff" stroke-opacity=".45" stroke-width="10" stroke-linecap="round"/>
+    <g transform="translate(300 147) scale(0.86) translate(-300 -173)">
+        <path d="M252.96 166.28 q16.8 -25.2 33.6 0" fill="none" stroke="#170A2E" stroke-width="14" stroke-linecap="round"/>
+        <path d="M313.44 166.28 q16.8 -25.2 33.6 0" fill="none" stroke="#170A2E" stroke-width="14" stroke-linecap="round"/>
+        <path d="M245 176 c-9 12 -14 22 -5.5 29 c8.6 5 17 -5 8.6 -29z" fill="#35E0FF" stroke="#170A2E" stroke-width="5" stroke-linejoin="round"/>
+        <path d="M355 176 c9 12 14 22 5.5 29 c-8.6 5 -17 -5 -8.6 -29z" fill="#35E0FF" stroke="#170A2E" stroke-width="5" stroke-linejoin="round"/>
+        <clipPath id="gt-mouth-icon"><path d="M255 186 H345 Q343.4 238 300 239.6 Q256.6 238 255 186Z"/></clipPath>
+        <g clip-path="url(#gt-mouth-icon)">
+          <rect x="220" y="175" width="160" height="84" fill="#170A2E"/>
+          <rect x="220" y="183" width="160" height="17" fill="#fff"/>
+          <ellipse cx="300" cy="239.6" rx="27" ry="19" fill="#FF9ACB"/>
+        </g>
+        <path d="M255 186 H345 Q343.4 238 300 239.6 Q256.6 238 255 186Z" fill="none" stroke="#170A2E" stroke-width="8" stroke-linejoin="round"/>
+      </g>
+    <path d="M241.9 198.9 A76 76 0 1 1 358.1 198.9 L300 268 Z" fill="none" stroke="#170A2E" stroke-width="16" stroke-linejoin="round"/>
+  </g>
+</svg>

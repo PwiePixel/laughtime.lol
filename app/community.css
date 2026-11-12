@@ -1,0 +1,1171 @@
+/* ------------------------------------------------------------------
+   Header navigation & account menu
+   ------------------------------------------------------------------ */
+.main-nav {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 2px solid rgba(255, 255, 255, 0.12);
+}
+
+.main-nav a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  color: var(--white);
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.main-nav a:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.main-nav a.active {
+  background: var(--yellow);
+  color: var(--ink);
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.account-placeholder {
+  display: inline-block;
+  width: 96px;
+  height: 38px;
+}
+
+.login-btn {
+  min-height: 38px;
+}
+
+.account-menu {
+  position: relative;
+}
+
+.account-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 10px 3px 3px;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--white);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.account-trigger .avatar {
+  box-shadow: none;
+  border-width: 2px;
+}
+
+.account-name {
+  max-width: 9em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-dropdown {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  z-index: 60;
+  min-width: 210px;
+  padding: 8px;
+  display: grid;
+  gap: 2px;
+  animation: pop 0.2s ease;
+}
+
+.account-dropdown a,
+.account-dropdown button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink);
+  font-weight: 600;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.card .account-dropdown a {
+  color: var(--ink);
+}
+
+.account-dropdown a:hover,
+.account-dropdown button:hover {
+  background: rgba(23, 10, 46, 0.07);
+}
+
+/* ------------------------------------------------------------------
+   Home: hero with the logo built into the page
+   ------------------------------------------------------------------ */
+.hero-copy {
+  position: relative;
+}
+
+.hero-logo {
+  display: block;
+  width: min(440px, 92%);
+  height: auto;
+  margin: 0 0 4px -10px;
+  filter: drop-shadow(0 10px 18px rgba(0, 0, 0, 0.25));
+}
+
+/* --- animated LoL logo: every letter bounces on its own ------------------ */
+.lol-anim {
+  overflow: visible;
+  aspect-ratio: 620 / 300;
+}
+
+.lol-anim .lol-part,
+.lol-anim .lol-star,
+.lol-anim .lol-face {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+}
+
+.lol-anim .lol-part {
+  animation: lol-bounce 2.8s cubic-bezier(0.3, 0, 0.3, 1) infinite;
+  cursor: pointer;
+}
+
+.lol-anim .lol-l1 {
+  animation-delay: 0s;
+}
+
+.lol-anim .lol-o {
+  animation-delay: 0.18s;
+}
+
+.lol-anim .lol-l2 {
+  animation-delay: 0.36s;
+}
+
+/* the face also giggles while it jumps */
+.lol-anim .lol-face {
+  transform-origin: 50% 50%;
+  animation: lol-giggle 2.8s ease-in-out 0.18s infinite;
+}
+
+.lol-anim .lol-star {
+  transform-origin: 50% 50%;
+  animation: lol-twinkle 2.2s ease-in-out infinite;
+}
+
+.lol-anim .st2 {
+  animation-delay: 0.7s;
+}
+
+.lol-anim .st3 {
+  animation-delay: 1.3s;
+}
+
+/* hover a letter: it does an extra hop */
+.lol-anim .lol-part:hover {
+  animation: lol-hop 0.55s cubic-bezier(0.3, 0, 0.3, 1);
+}
+
+@keyframes lol-bounce {
+  0%,
+  55%,
+  100% {
+    transform: translateY(0) scale(1, 1);
+  }
+  8% {
+    transform: translateY(0) scale(1.08, 0.9);
+  }
+  20% {
+    transform: translateY(-22%) scale(0.94, 1.08);
+  }
+  30% {
+    transform: translateY(-24%) scale(0.97, 1.04);
+  }
+  40% {
+    transform: translateY(0) scale(1.12, 0.86);
+  }
+  47% {
+    transform: translateY(-5%) scale(0.98, 1.03);
+  }
+}
+
+@keyframes lol-hop {
+  0% {
+    transform: scale(1.1, 0.88);
+  }
+  45% {
+    transform: translateY(-20%) scale(0.92, 1.1) rotate(-6deg);
+  }
+  80% {
+    transform: translateY(0) scale(1.08, 0.92);
+  }
+  100% {
+    transform: none;
+  }
+}
+
+@keyframes lol-giggle {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  15% {
+    transform: rotate(-9deg);
+  }
+  25% {
+    transform: rotate(8deg);
+  }
+  35% {
+    transform: rotate(-6deg);
+  }
+  45% {
+    transform: rotate(4deg);
+  }
+  55% {
+    transform: rotate(0deg);
+  }
+}
+
+@keyframes lol-twinkle {
+  0%,
+  100% {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(0.55) rotate(45deg);
+    opacity: 0.55;
+  }
+}
+
+.hero-title {
+  font-size: clamp(1.9rem, 4.4vw, 3.1rem);
+  margin: 6px 0 14px;
+}
+
+.sparkle {
+  position: absolute;
+  pointer-events: none;
+  animation: twinkle 2.6s ease-in-out infinite;
+}
+
+.sparkle.s1 {
+  width: 36px;
+  top: -8px;
+  left: min(36%, 150px);
+}
+
+.sparkle.s2 {
+  width: 24px;
+  top: 16px;
+  left: min(70%, 330px);
+  animation-delay: 0.8s;
+}
+
+.sparkle.s3 {
+  width: 26px;
+  top: 150px;
+  left: min(86%, 430px);
+  animation-delay: 1.4s;
+}
+
+@keyframes twinkle {
+  50% {
+    transform: scale(0.7) rotate(20deg);
+    opacity: 0.6;
+  }
+}
+
+.playing-as {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 16px;
+  padding: 12px;
+  border-radius: 16px;
+  background: rgba(23, 10, 46, 0.05);
+}
+
+.playing-as div {
+  display: grid;
+}
+
+.playing-as strong {
+  font-size: 1.3rem;
+  line-height: 1.2;
+}
+
+.guest-hint {
+  margin: 14px 0 0;
+  color: var(--muted);
+}
+
+.guest-hint .icon {
+  margin-right: 2px;
+  color: #b0126a;
+}
+
+.community {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 22px;
+  align-items: start;
+  margin-top: 40px;
+}
+
+.section-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.section-row h2 {
+  margin: 0;
+  font-size: clamp(1.3rem, 2.6vw, 1.7rem);
+}
+
+.more-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.mini-board {
+  list-style: none;
+  margin: 0 0 14px;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.mini-board li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 12px;
+  background: var(--white);
+}
+
+.mini-board .lb-user span {
+  max-width: 9em;
+}
+
+/* ------------------------------------------------------------------
+   Shared page layout
+   ------------------------------------------------------------------ */
+.page-wide {
+  max-width: 1100px;
+  margin: 16px auto 0;
+}
+
+.page-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+  margin-bottom: 18px;
+}
+
+.page-head h1 {
+  margin-bottom: 2px;
+}
+
+.page-head p {
+  margin: 0;
+}
+
+.row-gap {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.stack {
+  display: grid;
+  gap: 22px;
+  align-content: start;
+}
+
+.top-gap {
+  margin-top: 16px;
+}
+
+.with-icon.left {
+  justify-content: flex-start;
+}
+
+.tabs {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px;
+  border: var(--border);
+  border-radius: 16px;
+  background: var(--card);
+  box-shadow: var(--shadow-sm);
+}
+
+.tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border: 0;
+  border-radius: 11px;
+  background: transparent;
+  color: var(--ink);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.tabs button.on {
+  background: var(--yellow);
+  box-shadow: inset 0 0 0 2px var(--ink);
+}
+
+.tabs.wide {
+  margin-bottom: 18px;
+}
+
+.card .tabs {
+  display: flex;
+  box-shadow: none;
+  border-width: 2px;
+  background: rgba(23, 10, 46, 0.04);
+}
+
+.card .tabs button {
+  flex: 1;
+  justify-content: center;
+}
+
+.filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.empty-card {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  max-width: 560px;
+  margin: 20px auto;
+}
+
+.empty-note {
+  padding: 18px;
+  border: 2px dashed rgba(255, 255, 255, 0.25);
+  border-radius: 16px;
+  color: var(--muted-on-dark);
+  text-align: center;
+}
+
+.link-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.link-btn.danger {
+  color: #c21d5c;
+}
+
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 14px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.flash {
+  margin: 0 0 18px;
+  padding: 10px 14px;
+  border: var(--border);
+  border-radius: 14px;
+  font-weight: 700;
+  color: var(--ink);
+  animation: pop 0.25s ease;
+}
+
+.flash.ok {
+  background: var(--green);
+}
+
+.flash.bad {
+  background: #ffb3cc;
+}
+
+.btn-discord {
+  --btn-bg: #5865f2;
+  color: #fff !important;
+}
+
+.btn-danger {
+  --btn-bg: #ff5c7a;
+}
+
+.field-hint {
+  margin: 6px 0 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.field-hint.good {
+  color: #178a3e;
+  font-weight: 600;
+}
+
+.field-hint.bad {
+  color: #c21d5c;
+  font-weight: 600;
+}
+
+/* ------------------------------------------------------------------
+   Auth & account
+   ------------------------------------------------------------------ */
+.auth-page .tabs {
+  margin-bottom: 14px;
+}
+
+.auth-intro {
+  margin-bottom: 16px;
+}
+
+.auth-submit {
+  margin-top: 18px;
+}
+
+.auth-legal {
+  margin-top: 14px;
+}
+
+.join-login {
+  margin: 14px 0 0;
+}
+
+.account-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+  gap: 22px;
+  align-items: start;
+}
+
+.danger-zone {
+  border-color: #c21d5c;
+  box-shadow: 0 6px 0 #c21d5c;
+}
+
+/* ------------------------------------------------------------------
+   Profile
+   ------------------------------------------------------------------ */
+.profile-head {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  flex-wrap: wrap;
+}
+
+.profile-id {
+  flex: 1;
+  min-width: 220px;
+}
+
+.profile-id h1 {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.profile-id p {
+  margin: 2px 0 0;
+}
+
+.profile-bio {
+  margin-top: 10px !important;
+  font-size: 1.05rem;
+}
+
+.profile-side {
+  display: grid;
+  justify-items: end;
+  gap: 10px;
+}
+
+.rank-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border: var(--border);
+  border-radius: 999px;
+  background: var(--yellow);
+  font-weight: 700;
+  box-shadow: var(--shadow-sm);
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 22px;
+}
+
+.stat-tile {
+  display: grid;
+  gap: 2px;
+  padding: 14px 16px;
+  border: var(--border);
+  border-radius: 18px;
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: var(--shadow-sm);
+}
+
+.stat-tile .icon {
+  color: #7a5fa8;
+}
+
+.stat-tile strong {
+  font-size: clamp(1.4rem, 3vw, 2rem);
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-tile span {
+  font-weight: 600;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.stat-tile.yellow {
+  background: #fff1b8;
+}
+
+.stat-tile.pink {
+  background: #ffd6ea;
+}
+
+.stat-tile.cyan {
+  background: #d3f7ff;
+}
+
+/* ------------------------------------------------------------------
+   Meme gallery
+   ------------------------------------------------------------------ */
+.meme-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 20px;
+  margin-bottom: 22px;
+}
+
+.meme-grid.compact {
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+}
+
+.meme-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+  gap: 10px;
+  padding: 10px;
+  align-content: start;
+}
+
+.meme-card-media .meme-frame {
+  border-radius: 12px;
+}
+
+.meme-card-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.meme-author {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.card .meme-author {
+  color: var(--ink);
+}
+
+.meme-author span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.meme-author.big span {
+  display: grid;
+  font-size: 1.15rem;
+}
+
+.meme-card-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 10px;
+}
+
+.meme-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  text-decoration: none;
+}
+
+.card .meme-open {
+  color: var(--muted);
+}
+
+.like-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.like-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 3px 12px;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  background: var(--white);
+  color: var(--ink);
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.1s ease;
+}
+
+.like-btn:active:not(:disabled) {
+  transform: scale(1.12);
+}
+
+.like-btn.on {
+  background: var(--pink);
+}
+
+.like-btn:disabled {
+  cursor: default;
+  opacity: 0.8;
+}
+
+.like-hint {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 8px);
+  z-index: 10;
+  width: max-content;
+  max-width: 220px;
+  padding: 8px 10px;
+  border: 2px solid var(--ink);
+  border-radius: 10px;
+  background: var(--yellow);
+  color: var(--ink);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.rank-badge {
+  position: absolute;
+  top: -12px;
+  left: -10px;
+  z-index: 6;
+  display: grid;
+  place-items: center;
+  min-width: 44px;
+  height: 44px;
+  padding: 0 6px;
+  border: var(--border);
+  border-radius: 50%;
+  font-weight: 700;
+  box-shadow: var(--shadow-sm);
+  transform: rotate(-8deg);
+  background: var(--white);
+}
+
+.rank-badge.rank-1 {
+  background: var(--yellow);
+}
+
+.rank-badge.rank-2 {
+  background: var(--cyan);
+}
+
+.rank-badge.rank-3 {
+  background: var(--pink);
+}
+
+.gallery-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--green);
+  color: var(--ink) !important;
+  border: 2px solid var(--ink);
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.meme-detail {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 24px;
+  align-items: start;
+}
+
+.meme-detail-media .meme-frame {
+  border: var(--border);
+  box-shadow: var(--shadow);
+}
+
+.meme-detail-side {
+  display: grid;
+  gap: 16px;
+}
+
+.detail-stats {
+  display: grid;
+  gap: 8px;
+  font-weight: 600;
+}
+
+.detail-stats span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ------------------------------------------------------------------
+   Leaderboard
+   ------------------------------------------------------------------ */
+.lb-podium {
+  margin-top: 6px;
+}
+
+.lb-podium .podium-spot {
+  color: var(--white);
+  text-decoration: none;
+}
+
+.lb-table-wrap {
+  padding: 8px;
+  overflow-x: auto;
+}
+
+.lb-table {
+  width: 100%;
+  border-collapse: collapse;
+  /* long names are shortened instead of making the table wider than the card */
+  table-layout: fixed;
+}
+
+.lb-table th:first-child {
+  width: 52px;
+}
+
+.lb-table th.num {
+  width: 110px;
+}
+
+.lb-table td {
+  overflow: hidden;
+}
+
+.lb-table .lb-user {
+  display: flex;
+  max-width: 100%;
+}
+
+.lb-user > span > * {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lb-table th {
+  padding: 10px 12px;
+  text-align: left;
+  font-size: 0.85rem;
+  color: var(--muted);
+  border-bottom: 2px solid rgba(23, 10, 46, 0.1);
+}
+
+.lb-table td {
+  padding: 8px 12px;
+  border-bottom: 1px solid rgba(23, 10, 46, 0.07);
+}
+
+.lb-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.lb-table tr.is-me td {
+  background: #fff1b8;
+}
+
+.lb-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.lb-table .strong {
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+.lb-table .rank {
+  width: 40px;
+  font-weight: 700;
+}
+
+.lb-user {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  text-decoration: none;
+}
+
+.card .lb-user {
+  color: var(--ink);
+}
+
+.lb-user > span {
+  display: grid;
+  line-height: 1.2;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lb-cta {
+  margin-top: 18px;
+}
+
+/* ------------------------------------------------------------------
+   In-game account markers
+   ------------------------------------------------------------------ */
+.player-link {
+  color: inherit !important;
+  text-decoration: none;
+}
+
+.player-link:hover {
+  text-decoration: underline;
+}
+
+.verified {
+  margin-left: 4px;
+  color: #178a3e;
+  vertical-align: -2px;
+}
+
+.final-cta {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 16px 0 0;
+}
+
+/* ------------------------------------------------------------------
+   Responsive
+   ------------------------------------------------------------------ */
+@media (max-width: 960px) {
+  .community,
+  .account-grid,
+  .meme-detail {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .stat-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .main-nav {
+    order: 3;
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .main-nav a {
+    flex: 1;
+    justify-content: center;
+    padding: 6px 8px;
+  }
+}
+
+@media (max-width: 720px) {
+  .hero-logo {
+    width: min(340px, 92%);
+  }
+
+  .sparkle.s3 {
+    display: none;
+  }
+
+  .account-name {
+    display: none;
+  }
+
+  .account-trigger {
+    padding: 3px;
+  }
+
+  .main-nav a {
+    font-size: 0.85rem;
+    gap: 4px;
+  }
+
+  .profile-head {
+    justify-content: center;
+    text-align: center;
+  }
+
+  .profile-side {
+    justify-items: center;
+    width: 100%;
+  }
+
+  .hide-sm {
+    display: none;
+  }
+
+  .lb-table th:first-child {
+    width: 32px;
+  }
+
+  .lb-table th.num {
+    width: 72px;
+  }
+
+  .lb-table td,
+  .lb-table th {
+    padding: 8px 6px;
+  }
+}
+
+@media (max-width: 420px) {
+  .brand-text {
+    display: none;
+  }
+
+  .login-btn span {
+    display: none;
+  }
+}
+
+.auth-page .card > p.small {
+  margin: 14px 0 0;
+}
+
+/* remove button next to each caption field */
+.caption-remove {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  margin-top: 9px;
+  padding: 0;
+  border: 2px solid var(--ink);
+  border-radius: 50%;
+  background: var(--white);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.caption-remove:hover {
+  background: #ffb3cc;
+}
+
+/* download button: progress ring while a GIF is being created */
+.dl-progress {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: conic-gradient(var(--ink) var(--p, 0deg), rgba(23, 10, 46, 0.18) 0);
+}
+
+.dl-progress span {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--yellow);
+  font-size: 0.62rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.meme-download {
+  overflow: visible;
+}
+
+.gif-tag {
+  position: absolute;
+  top: -8px;
+  right: -10px;
+  padding: 0 4px;
+  border: 2px solid var(--ink);
+  border-radius: 6px;
+  background: var(--pink);
+  color: var(--ink);
+  font-size: 0.55rem;
+  font-weight: 700;
+  line-height: 1.3;
+  pointer-events: none;
+}

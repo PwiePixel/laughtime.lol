@@ -1,0 +1,32 @@
+{
+  "name": "laughtime",
+  "version": "1.0.0",
+  "private": true,
+  "description": "LaughTime.lol – multiplayer meme party game with images and short video clips",
+  "type": "module",
+  "main": "index.js",
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node index.js --dev",
+    "build": "next build",
+    "geotime": "node geotime/cli.js list",
+    "geotime:beta": "node geotime/cli.js beta"
+  },
+  "dependencies": {
+    "@discord/embedded-app-sdk": "^2.5.0",
+    "@photo-sphere-viewer/core": "5.15.1",
+    "@photo-sphere-viewer/markers-plugin": "5.15.1",
+    "gifenc": "1.0.3",
+    "lucide-react": "1.46.0",
+    "mapillary-js": "4.1.2",
+    "maplibre-gl": "6.10.0",
+    "next": "16.3.5",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "sharp": "0.35.4",
+    "ws": "8.21.3"
+  }
+}
