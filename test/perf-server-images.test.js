@@ -311,6 +311,16 @@ test('other hosts and other file types are refused', async () => {
   assert.equal(missing.status, 502);
 });
 
+test('a dead file is asked for once, not with every request', async () => {
+  const answers = await Promise.all(Array.from({ length: 6 }, () => media('gone.jpg', '&w=320')));
+  assert.deepEqual(answers.map((r) => r.status), Array(6).fill(502));
+  assert.equal((await media('gone.jpg')).status, 502);
+  assert.equal(upstreamHits['gone.jpg'], 1, 'the media host saw a single request');
+  assert.equal((await media('page.html')).status, 415);
+  assert.equal(upstreamHits['page.html'], 1, 'a wrong file type is remembered as well');
+  assert.ok(proxyStats().variants.failedCached >= 2, 'answered from memory');
+});
+
 test('variants count towards the cache limit and leave together with their original', async () => {
   const cfg = getConfig();
   const before = await sweepCache();

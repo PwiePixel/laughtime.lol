@@ -58,6 +58,11 @@ const files = (key) => {
 const metaCache = createTtlCache({ ttlMs: 10 * 60 * 1000, max: 4000 });
 // "last used" on disk drives the clean-up; once every few minutes per file is exact enough
 const touched = createTtlCache({ ttlMs: 5 * 60 * 1000, max: 8000 });
+// Files that could not be loaded. Without this every request for a dead address
+// (an old link, a search result that vanished) would ask the source again.
+const failed = createTtlCache({ ttlMs: 30 * 1000, max: 4000 });
+const GONE_TTL = 10 * 60 * 1000; // "does not exist / not a picture": will not change soon
+const RETRY_TTL = 20 * 1000; // source busy or unreachable: try again shortly
 
 function touch(file) {
   if (touched.get(file)) return;
@@ -82,7 +87,7 @@ async function download(url) {
   }
   if (!res.ok) {
     res.body?.cancel().catch(() => {});
-    throw Object.assign(new Error(`upstream ${res.status}`), { status: 502 });
+    throw Object.assign(new Error(`upstream ${res.status}`), { status: 502, upstream: res.status });
   }
   if (!isAllowedUrl(res.url || url)) {
     res.body?.cancel().catch(() => {});
@@ -136,11 +141,22 @@ async function ensureCached(url) {
   } catch {
     /* not cached */
   }
+  const miss = failed.get(key);
+  if (miss) {
+    counts.failedCached += 1;
+    throw Object.assign(new Error(miss.message), { status: miss.status, repeated: true });
+  }
   if (!inflight.has(url)) {
     inflight.set(
       url,
       download(url)
         .then((meta) => metaCache.set(key, meta))
+        .catch((err) => {
+          // 4xx from the source (except "slow down") and wrong file types stay wrong for a while
+          const gone = (err.upstream >= 400 && err.upstream < 500 && err.upstream !== 429 && err.upstream !== 408) || [403, 413, 415].includes(err.status);
+          failed.set(key, { message: String(err.message), status: err.status || 502 }, { ttlMs: gone ? GONE_TTL : RETRY_TTL });
+          throw err;
+        })
         .finally(() => inflight.delete(url)),
     );
   }
@@ -164,7 +180,7 @@ const CONVERT_SECONDS = 30;
 const MARKER_TTL = 24 * 60 * 60 * 1000;
 const TYPE_OF = { avif: 'image/avif', webp: 'image/webp', jpeg: 'image/jpeg', png: 'image/png' };
 const SAME_FORMAT = { 'image/jpeg': 'jpeg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'png' };
-const counts = { downloads: 0, made: 0, failed: 0, notSmaller: 0, busy: 0, served: 0, servedOriginal: 0, notModified: 0 };
+const counts = { downloads: 0, failedCached: 0, made: 0, failed: 0, notSmaller: 0, busy: 0, served: 0, servedOriginal: 0, notModified: 0 };
 
 let work = null;
 const workQueue = () => (work ||= createWorkQueue({ concurrency: getConfig().imageWorkers, maxQueue: 60 }));
@@ -344,7 +360,8 @@ export async function handleMediaRequest(req, res, searchParams) {
     try {
       meta = await ensureCached(url);
     } catch (err) {
-      console.warn(`[media] could not load ${url}: ${err.message}`);
+      // logged once – repeated requests for the same dead file are answered from memory
+      if (!err.repeated) console.warn(`[media] could not load ${url}: ${err.message}`);
       markBroken(url);
       res.writeHead(err.status || 502, { 'Content-Type': 'text/plain', 'Cache-Control': 'no-store' });
       return res.end('media unavailable');
@@ -549,6 +566,7 @@ export const _test = {
     testOrigins.clear();
     metaCache.clear();
     touched.clear();
+    failed.clear();
     inflight.clear();
     work = null;
     cacheBytes = null;
