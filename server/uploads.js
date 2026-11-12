@@ -233,6 +233,66 @@ export async function sweepRoomUploads(maxAgeMs = 6 * 60 * 60 * 1000) {
 
 // --- serving -------------------------------------------------------------------------
 
+// How long a browser may keep a file. Always "private": a proxy or CDN in front
+// of the server must never store uploads – a file that was deleted (by its
+// owner or by a moderator) has to be gone for everybody else at once.
+//   packs    the name is random and the content never changes: keep it for good
+//   rooms    pictures of a running swap round: a few minutes, then ask again
+//   reports  evidence for the admins: never stored anywhere
+const CACHE_RULES = {
+  packs: 'private, max-age=31536000, immutable',
+  rooms: 'private, max-age=600',
+  reports: 'private, no-store',
+};
+
+/** If-None-Match: does one of the listed tags match ours? */
+function tagMatches(header, etag) {
+  const value = String(header || '').trim();
+  if (value === '*') return true;
+  return value.split(',').some((t) => t.trim().replace(/^W\//, '') === etag);
+}
+
+/**
+ * Send an open file with ETag / Last-Modified, or "304 Not Modified" when the
+ * browser already has exactly this version. Closes the handle in every case.
+ */
+async function sendFile(req, res, handle, st, { type, folder, id }) {
+  const stored = CACHE_RULES[folder] !== CACHE_RULES.reports;
+  const modified = new Date(Math.floor(st.mtimeMs / 1000) * 1000);
+  const etag = `"${id}-${st.size.toString(36)}-${Math.floor(st.mtimeMs).toString(36)}"`;
+  const headers = {
+    'Content-Type': type,
+    'Content-Length': st.size,
+    'Cache-Control': CACHE_RULES[folder] || CACHE_RULES.reports,
+    'X-Content-Type-Options': 'nosniff',
+    'Content-Security-Policy': "default-src 'none'; sandbox",
+    'Content-Disposition': 'inline',
+    'Cross-Origin-Resource-Policy': 'same-origin',
+    // no validators for files that must not be stored at all
+    ...(stored ? { ETag: etag, 'Last-Modified': modified.toUTCString() } : {}),
+  };
+  if (stored) {
+    const noneMatch = req.headers['if-none-match'];
+    const since = Date.parse(req.headers['if-modified-since'] || '');
+    if (noneMatch ? tagMatches(noneMatch, etag) : Number.isFinite(since) && modified.getTime() <= since) {
+      await handle.close().catch(() => {});
+      for (const name of ['Content-Type', 'Content-Length', 'Content-Disposition']) delete headers[name];
+      res.writeHead(304, headers);
+      return res.end();
+    }
+  }
+  res.writeHead(200, headers);
+  if (req.method === 'HEAD') {
+    await handle.close().catch(() => {});
+    return res.end();
+  }
+  const stream = handle.createReadStream({ autoClose: true });
+  stream.on('error', () => res.destroy());
+  // the browser went away: release the file
+  res.on('close', () => stream.destroy());
+  return stream.pipe(res);
+}
+
 export async function serveUpload(req, res, rel) {
   // Vorschaubild? Wird beim ersten Abruf erzeugt und liegt danach auf der Platte,
   // damit auch alte Uploads sofort schnell sind.
@@ -257,24 +317,7 @@ export async function serveUpload(req, res, rel) {
     res.writeHead(404, { 'Content-Type': 'text/plain', 'Cache-Control': 'no-store' });
     return res.end('not found');
   }
-  const headers = {
-    'Content-Type': MIME[m[3]],
-    'Content-Length': st.size,
-    'Cache-Control': m[1] === 'packs' ? 'public, max-age=31536000, immutable' : 'private, no-store',
-    'X-Content-Type-Options': 'nosniff',
-    'Content-Security-Policy': "default-src 'none'; sandbox",
-    'Content-Disposition': 'inline',
-    'Cross-Origin-Resource-Policy': 'same-origin',
-  };
-  res.writeHead(200, headers);
-  if (req.method === 'HEAD') {
-    await handle.close().catch(() => {});
-    return res.end();
-  }
-  return handle
-    .createReadStream({ autoClose: true })
-    .on('error', () => res.destroy())
-    .pipe(res);
+  return sendFile(req, res, handle, st, { type: MIME[m[3]], folder: m[1], id: m[2] });
 }
 
 /** Vorschaubild ausliefern (und beim ersten Mal erzeugen) */
@@ -312,22 +355,7 @@ async function serveThumb(req, res, m) {
     res.writeHead(404, { 'Content-Type': 'text/plain', 'Cache-Control': 'no-store' });
     return res.end('not found');
   }
-  res.writeHead(200, {
-    'Content-Type': 'image/webp',
-    'Content-Length': st.size,
-    'Cache-Control': folder === 'packs' ? 'public, max-age=31536000, immutable' : 'private, max-age=600',
-    'X-Content-Type-Options': 'nosniff',
-    'Content-Security-Policy': "default-src 'none'; sandbox",
-    'Cross-Origin-Resource-Policy': 'same-origin',
-  });
-  if (req.method === 'HEAD') {
-    await handle.close().catch(() => {});
-    return res.end();
-  }
-  return handle
-    .createReadStream({ autoClose: true })
-    .on('error', () => res.destroy())
-    .pipe(res);
+  return sendFile(req, res, handle, st, { type: 'image/webp', folder, id: `t-${id}` });
 }
 
 export { thumbRel };
