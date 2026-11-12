@@ -190,3 +190,76 @@ test('swap: search results belong to one bring phase', async () => {
   assert.equal(ann.state.upload.mine, null);
   assert.deepEqual(logged, []);
 });
+
+test('quick play: a public GIF Hunt room runs by itself, an absent player holds nobody up', async () => {
+  env.search();
+  const trio = [env.client().open(), env.client().open(), env.client().open()];
+  for (const c of trio) c.send({ t: 'queue', game: 'hunt', pid: c.pid, name: c.name, avatar: 'cat|1' });
+  await env.advance(1000);
+  const code = trio[0].take('matched')[0].code;
+  for (const c of trio) {
+    c.drop();
+    c.join(code);
+  }
+  const [ann, ben, cleo] = trio;
+  assert.equal(ann.state.isPublic, true);
+  assert.equal(ann.state.hostId, null);
+  assert.equal(ann.state.settings.searches, 0);
+  // nobody is the host: settings, start, kick and skip do nothing
+  ann.send({ t: 'settings', settings: { ...ann.state.settings, rounds: 1, game: 'swap', searches: 4 } });
+  ann.send({ t: 'kick', pid: cleo.pid }).send({ t: 'start' });
+  await flush();
+  assert.equal(ann.state.phase, 'lobby');
+  await env.advance(3500);
+  await flush();
+  assert.equal(ann.state.phase, 'caption');
+  assert.equal(ann.state.settings.rounds, 3);
+  assert.equal(ann.state.settings.game, 'hunt');
+  assert.equal(ann.state.players.length, 3);
+  assert.equal(ann.state.caption.hunt.max, 2);
+
+  const play = async (round) => {
+    assert.equal(ann.state.round, round);
+    const began = env.now();
+    ann.send({ t: 'skip' });
+    for (const p of [ann, ben]) {
+      p.send({ t: 'search', random: true });
+      p.send({ t: 'submit', captions: caption(`${p.name} ${round}`) });
+    }
+    if (round === 1) {
+      // Cleo does nothing: two of three are done, the last call ends the phase at half time
+      assert.equal(ann.state.lastCall, true);
+      assert.equal(ann.state.deadline, began + 45_000);
+      await env.advance(45_000);
+    } else {
+      // from now on she is away and not waited for
+      assert.equal(ann.state.players.find((p) => p.id === cleo.pid).away, true);
+      await env.advance(1500);
+    }
+    assert.equal(ann.state.phase, 'vote');
+    assert.equal(ann.state.vote.total, 2);
+    for (let i = 0; i < 2; i++) {
+      for (const p of [ann, ben]) if (!p.state.vote.isMine) p.send({ t: 'vote', score: 4 });
+      await env.advance(900);
+      assert.equal(ann.state.vote.stage, 'reveal');
+      await env.advance(3500);
+    }
+    assert.equal(ann.state.phase, 'scores');
+    await env.advance(12_000);
+  };
+  for (let round = 1; round <= 3; round++) await play(round);
+  assert.equal(ann.state.phase, 'final');
+  assert.equal(ann.state.final.tie, true);
+  assert.deepEqual(ann.state.final.ranking.map((r) => [r.rank, r.score]), [[1, 12], [1, 12], [3, 0]]);
+  ann.send({ t: 'again' });
+  assert.equal(ann.state.phase, 'final');
+  // the next game starts by itself with a clean sheet
+  await env.advance(20_000);
+  assert.equal(ann.state.phase, 'lobby');
+  await env.advance(3500);
+  await flush();
+  assert.equal(ann.state.phase, 'caption');
+  assert.equal(ann.state.round, 1);
+  for (const p of ann.state.players) assert.deepEqual([p.score, p.away, p.streak, p.lastPoints], [0, false, 0, 0]);
+  assert.deepEqual(logged, []);
+});
