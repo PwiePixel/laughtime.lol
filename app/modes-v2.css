@@ -1675,6 +1675,16 @@ button.strip-player {
     bottom: calc(78px + var(--kb, 0px) + var(--saib, env(safe-area-inset-bottom, 0px)));
   }
 
+  /* the app shell's own toasts (offline, back online) must not cover the bar's button either */
+  html.has-action-bar .pwa-stack {
+    bottom: calc(78px + var(--kb, 0px) + var(--saib, env(safe-area-inset-bottom, 0px)));
+  }
+
+  /* ... and move above a game toast, which may run over two lines on a phone */
+  html.has-action-bar body:has(> .main .toast) .pwa-stack {
+    bottom: calc(160px + var(--kb, 0px) + var(--saib, env(safe-area-inset-bottom, 0px)));
+  }
+
   .has-bar .desktop-action {
     display: none !important;
   }
