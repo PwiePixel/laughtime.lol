@@ -2,8 +2,8 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
-import { api } from '@/lib/api';
+import { useState } from 'react';
+import { useCachedFetch } from '@/lib/fetchCache';
 import Avatar from './Avatar';
 import Icon from './Icon';
 import { MediaThumb } from './PackCard';
@@ -13,15 +13,11 @@ import { playPack } from './StudioPage';
 export default function PackPage({ id }) {
   const { t } = useApp();
   const router = useRouter();
-  const [pack, setPack] = useState(undefined);
+  // undefined = loading, null = not found; a pack opened a moment ago is there at once
+  const loaded = useCachedFetch(`/api/packs/${id}`, { ttl: 30_000 });
+  const pack = loaded.data?.pack ?? (loaded.error ? null : undefined);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-
-  useEffect(() => {
-    api(`/api/packs/${id}`)
-      .then((d) => setPack(d.pack))
-      .catch(() => setPack(null));
-  }, [id]);
 
   if (pack === undefined) {
     return (
@@ -61,7 +57,7 @@ export default function PackPage({ id }) {
   return (
     <div className="page pack-page">
       <section className="card pack-header">
-        <MediaThumb media={pack.cover} className="pack-hero-cover" />
+        <MediaThumb media={pack.cover} className="pack-hero-cover" size={180} priority />
         <div className="pack-header-text">
           <span className="muted small with-icon left">
             <Icon name="package" size={16} /> {t('lobby.pack')}
@@ -99,7 +95,7 @@ export default function PackPage({ id }) {
       <div className="media-grid big">
         {pack.items.map((m) => (
           <div key={m.id} className="media-tile">
-            <MediaThumb media={m} />
+            <MediaThumb media={m} size={220} />
             <span className="media-title" title={m.title}>
               {m.title}
             </span>

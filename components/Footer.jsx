@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useMemo } from 'react';
+import { useCachedFetch } from '@/lib/fetchCache';
 import { OPERATOR } from '@/lib/operator';
 import { useApp } from './Providers';
 
@@ -12,16 +13,14 @@ const SOURCES = {
   reddit: { label: 'Reddit', url: 'https://www.reddit.com' },
 };
 
+// which sources are switched on changes with the server settings only
+const SOURCES_FRESH_MS = 5 * 60_000;
+
 export default function Footer() {
   const { t } = useApp();
-  const [sources, setSources] = useState([]);
-
-  useEffect(() => {
-    fetch('/api/sources')
-      .then((r) => r.json())
-      .then((d) => setSources((d.sources || []).filter((s) => SOURCES[s])))
-      .catch(() => {});
-  }, []);
+  // the start page asks for the same list: both share one request
+  const { data } = useCachedFetch('/api/sources', { ttl: SOURCES_FRESH_MS });
+  const sources = useMemo(() => (data?.sources || []).filter((s) => SOURCES[s]), [data]);
 
   return (
     <footer className="footer">

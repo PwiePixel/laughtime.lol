@@ -4,11 +4,17 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
+import { cachedGet, peekCached } from '@/lib/fetchCache';
+import { useDebouncedValue } from '@/lib/timing';
 import Icon from './Icon';
 import MemeCard from './MemeCard';
 import { useApp } from './Providers';
 
 const PERIODS = ['week', 'month', 'all'];
+// a list that was just shown is still good when the visitor flips back to it
+const LIST_FRESH_MS = 30_000;
+// the first pictures are above the fold on every screen: they load first
+const EAGER_CARDS = 2;
 
 export default function GalleryPage({ user: userProp }) {
   const { t } = useApp();
@@ -29,23 +35,33 @@ export default function GalleryPage({ user: userProp }) {
     [sort, period, user],
   );
 
+  // clicking through the filters quickly: the first click loads at once, of the
+  // rest only the last one reaches the server
+  const firstPage = useDebouncedValue(query(0), 220, { leading: true });
+
   useEffect(() => {
     let alive = true;
-    setItems(null);
-    api(query(0))
-      .then((d) => {
-        if (!alive) return;
-        setItems(d.items);
-        setNextOffset(d.nextOffset);
-      })
-      .catch(() => alive && setItems([]));
+    const show = (d) => {
+      setItems(d.items);
+      setNextOffset(d.nextOffset);
+    };
+    // a list seen a moment ago is painted right away, without a spinner in between
+    const known = peekCached(firstPage);
+    if (known) show(known);
+    else setItems(null);
+    cachedGet(firstPage, { ttl: LIST_FRESH_MS })
+      .then((d) => alive && show(d))
+      .catch(() => alive && setItems((list) => list || []));
     return () => {
       alive = false;
     };
-  }, [query]);
+  }, [firstPage]);
+
+  // the list on screen still belongs to the previous filter for a moment
+  const settling = firstPage !== query(0);
 
   async function loadMore() {
-    if (nextOffset === null) return;
+    if (nextOffset === null || settling) return;
     setLoadingMore(true);
     try {
       const d = await api(query(nextOffset));
@@ -116,12 +132,12 @@ export default function GalleryPage({ user: userProp }) {
         <>
           <div className="meme-grid">
             {items.map((m, i) => (
-              <MemeCard key={m.id} meme={m} rank={sort === 'top' && !user && i < 3 ? i + 1 : null} onChange={update} onDelete={remove} />
+              <MemeCard key={m.id} meme={m} rank={sort === 'top' && !user && i < 3 ? i + 1 : null} onChange={update} onDelete={remove} priority={i < EAGER_CARDS} />
             ))}
           </div>
           {nextOffset !== null && (
             <p className="center-text">
-              <button type="button" className="btn btn-white" onClick={loadMore} disabled={loadingMore}>
+              <button type="button" className="btn btn-white" onClick={loadMore} disabled={loadingMore || settling}>
                 {loadingMore ? t('common.loading') : t('memes.more')}
               </button>
             </p>

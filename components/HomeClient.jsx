@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { ROOM_CODE_RE, sanitizeName } from '@/lib/shared';
 import Link from 'next/link';
-import { api } from '@/lib/api';
+import { cachedGet, peekCached } from '@/lib/fetchCache';
 import { usePublicInfo } from '@/lib/usePublicInfo';
 import Avatar from './Avatar';
 import AvatarPicker from './AvatarPicker';
@@ -44,13 +44,14 @@ function sampleCaption(text, y) {
 export default function HomeClient() {
   const router = useRouter();
   const { t, lang, profile, updateProfile, account } = useApp();
-  const [community, setCommunity] = useState(null);
+  // what an earlier visit of this page loaded is shown at once (and refreshed below)
+  const [community, setCommunity] = useState(() => peekCached('/api/community') ?? null);
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(null);
   const [error, setError] = useState('');
-  const [showcase, setShowcase] = useState([]);
-  const [sources, setSources] = useState(['imgflip']);
+  const [showcase, setShowcase] = useState(() => peekCached('/api/showcase')?.items || []);
+  const [sources, setSources] = useState(() => peekCached('/api/sources')?.sources || ['imgflip']);
   const [picker, setPicker] = useState(null); // 'quick' | 'private'
   const publicInfo = usePublicInfo(20000);
   const onlineNow = (publicInfo.classic?.players || 0) + (publicInfo.hunt?.players || 0);
@@ -61,15 +62,15 @@ export default function HomeClient() {
 
   useEffect(() => {
     let alive = true;
-    fetch('/api/showcase')
-      .then((r) => r.json())
+    // cached GETs: the footer needs /api/sources too, and coming back to the
+    // start page within the freshness window costs no request at all
+    cachedGet('/api/showcase', { ttl: 60_000 })
       .then((d) => alive && setShowcase(d.items || []))
       .catch(() => {});
-    api('/api/community')
+    cachedGet('/api/community', { ttl: 30_000 })
       .then((d) => alive && setCommunity(d))
-      .catch(() => alive && setCommunity({ topPlayers: [], topMemes: [], stats: {} }));
-    fetch('/api/sources')
-      .then((r) => r.json())
+      .catch(() => alive && setCommunity((c) => c || { topPlayers: [], topMemes: [], stats: {} }));
+    cachedGet('/api/sources', { ttl: 5 * 60_000 })
       .then((d) => alive && d.sources?.length && setSources(d.sources))
       .catch(() => {});
     return () => {

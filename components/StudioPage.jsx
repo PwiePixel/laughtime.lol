@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '@/lib/api';
+import { cachedGet, invalidateCache, peekCached, useCachedFetch } from '@/lib/fetchCache';
+import { useDebouncedValue } from '@/lib/timing';
 import { PACK_LIMITS } from '@/lib/shared';
 import { uploadFile } from '@/lib/upload';
 import { usePublicInfo } from '@/lib/usePublicInfo';
@@ -11,6 +13,9 @@ import Dropzone from './Dropzone';
 import Icon from './Icon';
 import PackCard, { MediaThumb } from './PackCard';
 import { useApp } from './Providers';
+
+// results of a search do not change within minutes – typing back and forth stays free
+const SEARCH_FRESH_MS = 3 * 60_000;
 
 const errText = (t, err, vars) => {
   const key = `err.${err?.code || err?.message || 'network'}`;
@@ -29,6 +34,8 @@ function UploadCard({ pack, onUploaded }) {
     setProgress(0);
     try {
       const d = await uploadFile(`/api/packs/${pack.id}/upload`, file, {}, setProgress);
+      // the upload bypasses api(): tell the cache that the pack lists are outdated
+      invalidateCache('/api/packs');
       onUploaded(d.pack);
     } catch (err) {
       setError(errText(t, err, { n: info.uploadMaxMb }));
@@ -100,12 +107,14 @@ export async function playPack(router, packId) {
   router.push(`/room/${data.code}`);
 }
 
-// The three mascots live in public/images/mascots – to swap them, just replace
-// the files (same names). size = how big the picture is drawn, x/y = fine tuning.
+// The three mascots live in public/images/mascots – to swap them, replace the
+// PNG (same name) and run "node scripts/optimize-assets.mjs": it writes the
+// small .avif/.webp versions the page really loads (the PNG is the fallback).
+// size = how big the picture is drawn, x/y = fine tuning.
 const STEPS = [
-  { key: 'search', img: '/images/mascots/LoL_Dedetiv-asset.png', size: 140, x: '-45%', y: '-45%' },
-  { key: 'pack', img: '/images/mascots/LoL_Bote-asset.png', size: 140, x: '-38%', y: '-40%' },
-  { key: 'play', img: '/images/mascots/LoL_Spieler-asset.png', size: 140, x: '-43%', y: '-49%' },
+  { key: 'search', img: '/images/mascots/LoL_Dedetiv-asset', size: 140, x: '-45%', y: '-45%' },
+  { key: 'pack', img: '/images/mascots/LoL_Bote-asset', size: 140, x: '-38%', y: '-40%' },
+  { key: 'play', img: '/images/mascots/LoL_Spieler-asset', size: 140, x: '-43%', y: '-49%' },
 ];
 
 function StudioSteps() {
@@ -118,7 +127,11 @@ function StudioSteps() {
             <span className="studio-step-img" aria-hidden="true">
               {/* the mascots are decoration – the text below says what happens */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={s.img} alt="" draggable="false" loading="lazy" />
+              <picture className="media-picture">
+                <source type="image/avif" srcSet={`${s.img}.avif`} />
+                <source type="image/webp" srcSet={`${s.img}.webp`} />
+                <img src={`${s.img}.png`} alt="" width={s.size} height={s.size} draggable="false" decoding="async" />
+              </picture>
             </span>
             <span className="studio-step-num" aria-hidden="true">
               {i + 1}
@@ -140,28 +153,28 @@ function SearchPanel({ pack, onAdd, busyId }) {
   const [error, setError] = useState('');
   const inPack = new Set((pack?.items || []).map((i) => i.id));
 
+  // search-as-you-type: one request once the typing pauses; an emptied box
+  // (= browse) answers at once, and a search that was just shown comes from the cache
+  const typed = q.trim();
+  const term = useDebouncedValue(typed, typed ? 450 : 0);
+  const searching = typed !== term;
+
   useEffect(() => {
     let alive = true;
-    setItems(null);
+    const url = `/api/studio/search?kind=${kind}&q=${encodeURIComponent(term.length >= 2 ? term : '')}`;
+    setItems(peekCached(url)?.items ?? null);
     setError('');
-    const term = q.trim();
-    const id = setTimeout(
-      () => {
-        api(`/api/studio/search?kind=${kind}&q=${encodeURIComponent(term.length >= 2 ? term : '')}`)
-          .then((d) => alive && setItems(d.items))
-          .catch((err) => {
-            if (!alive) return;
-            setItems([]);
-            setError(errText(t, err));
-          });
-      },
-      term ? 450 : 0,
-    );
+    cachedGet(url, { ttl: SEARCH_FRESH_MS })
+      .then((d) => alive && setItems(d.items))
+      .catch((err) => {
+        if (!alive) return;
+        setItems([]);
+        setError(errText(t, err));
+      });
     return () => {
       alive = false;
-      clearTimeout(id);
     };
-  }, [q, kind, t]);
+  }, [term, kind, t]);
 
   return (
     <section className="card studio-search">
@@ -192,13 +205,13 @@ function SearchPanel({ pack, onAdd, busyId }) {
       {!pack && <p className="form-error">{t('studio.selectPack')}</p>}
       {error && <p className="form-error">{error}</p>}
       <div className="media-grid">
-        {items === null && <div className="spinner" aria-hidden="true" />}
-        {items?.length === 0 && !error && <p className="muted">{t('studio.noResults')}</p>}
-        {items?.map((m) => {
+        {(items === null || searching) && <div className="spinner" aria-hidden="true" />}
+        {items?.length === 0 && !error && !searching && <p className="muted">{t('studio.noResults')}</p>}
+        {!searching && items?.map((m) => {
           const added = inPack.has(m.id);
           return (
             <div key={m.id} className={`media-tile ${added ? 'is-added' : ''}`}>
-              <MediaThumb media={m} />
+              <MediaThumb media={m} size={160} />
               <span className="media-title" title={m.title}>
                 {m.title}
               </span>
@@ -334,7 +347,7 @@ function PackEditor({ pack, onChange, onDelete, onRemove }) {
         <div className="media-grid in-pack">
           {pack.items.map((m) => (
             <div key={m.id} className="media-tile">
-              <MediaThumb media={m} />
+              <MediaThumb media={m} size={130} />
               <span className="media-title" title={m.title}>
                 {m.title}
               </span>
@@ -353,12 +366,7 @@ function PackEditor({ pack, onChange, onDelete, onRemove }) {
 
 function CommunityPacks() {
   const { t } = useApp();
-  const [packs, setPacks] = useState(null);
-  useEffect(() => {
-    api('/api/packs?scope=public&limit=12')
-      .then((d) => setPacks(d.items))
-      .catch(() => setPacks([]));
-  }, []);
+  const packs = useCachedFetch('/api/packs?scope=public&limit=12', { ttl: 60_000 }).data?.items;
   if (!packs?.length) return null;
   return (
     <section className="studio-community">

@@ -5,9 +5,10 @@ import { useActivity } from './ActivityContext';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { api, timeAgo } from '@/lib/api';
+import { cachedGet, peekCached } from '@/lib/fetchCache';
 import Avatar from './Avatar';
 import Icon from './Icon';
-import { LikeButton } from './MemeCard';
+import { DETAIL_MAX_HEIGHT, LikeButton } from './MemeCard';
 import { reportHttp } from './ReportDialog';
 import useReport from './useReport';
 import MemeCanvas from './MemeCanvas';
@@ -17,16 +18,22 @@ export default function MemePage({ id }) {
   const { t, lang } = useApp();
   const router = useRouter();
   const activity = useActivity();
-  const [meme, setMeme] = useState(null);
+  const url = `/api/memes/${encodeURIComponent(id)}`;
+  // opened a moment ago (back/forward): there at once
+  const [meme, setMeme] = useState(() => peekCached(url)?.meme ?? null);
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
   const [openReport, reportDialog] = useReport();
 
   useEffect(() => {
-    api(`/api/memes/${encodeURIComponent(id)}`)
-      .then((d) => setMeme(d.meme))
-      .catch((err) => setError(err.code));
-  }, [id]);
+    let alive = true;
+    cachedGet(url, { ttl: 30_000 })
+      .then((d) => alive && setMeme(d.meme))
+      .catch((err) => alive && setError(err.code || 'network'));
+    return () => {
+      alive = false;
+    };
+  }, [url]);
 
   if (error) {
     return (
@@ -74,7 +81,7 @@ export default function MemePage({ id }) {
       </Link>
       <div className="meme-detail">
         <div className="meme-detail-media">
-          <MemeCanvas media={meme.media} captions={meme.captions} maxHeight="min(70vh, 720px)" downloadable />
+          <MemeCanvas media={meme.media} captions={meme.captions} maxHeight={DETAIL_MAX_HEIGHT} downloadable priority />
         </div>
         <aside className="card meme-detail-side">
           <Link href={`/u/${meme.author.username}`} className="meme-author big">

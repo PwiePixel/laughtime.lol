@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
+import { cachedGet, peekCached } from '@/lib/fetchCache';
 import Avatar from './Avatar';
 import Icon from './Icon';
 import { reportHttp } from './ReportDialog';
@@ -22,20 +23,23 @@ function Stat({ icon, value, label, accent }) {
 
 export default function ProfilePage({ username }) {
   const { t, lang } = useApp();
-  const [data, setData] = useState(null);
+  const url = `/api/users/${encodeURIComponent(username)}`;
+  // a profile opened a moment ago is shown at once and refreshed when it got old
+  const [data, setData] = useState(() => peekCached(url) ?? null);
   const [error, setError] = useState('');
   const [openReport, reportDialog] = useReport();
 
   useEffect(() => {
     let alive = true;
-    setData(null);
-    api(`/api/users/${encodeURIComponent(username)}`)
+    setData(peekCached(url) ?? null);
+    setError('');
+    cachedGet(url, { ttl: 30_000 })
       .then((d) => alive && setData(d))
-      .catch((err) => alive && setError(err.code));
+      .catch((err) => alive && setError(err.code || 'network'));
     return () => {
       alive = false;
     };
-  }, [username]);
+  }, [url]);
 
   if (error) {
     return (

@@ -1,7 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '@/lib/api';
+import { usePolling } from '@/lib/fetchCache';
 import Icon from '../Icon';
 import { useApp } from '../Providers';
 import { ChartTable, HBars, Legend, LineChart, SERIES, StackedColumns, StatTile, timeFormatter } from './Charts';
@@ -9,25 +10,27 @@ import { ChartTable, HBars, Legend, LineChart, SERIES, StackedColumns, StatTile,
 const RANGES = ['24h', '7d', '30d'];
 const MODES = ['classic', 'hunt', 'swap'];
 
-export default function Dashboard() {
+/** Numbers and charts of the admin start tab (loaded on demand by ./Dashboard.jsx). */
+export default function DashboardView() {
   const { t, lang } = useApp();
   const [range, setRange] = useState('24h');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
 
+  // switching the range quickly: only the answer to the latest question counts
+  const latest = useRef(0);
   const load = useCallback(() => {
+    const ticket = ++latest.current;
     setLoading(true);
     api(`/api/admin/stats?range=${range}`)
-      .then(setData)
+      .then((d) => ticket === latest.current && setData(d))
       .catch(() => {})
-      .finally(() => setLoading(false));
+      .finally(() => ticket === latest.current && setLoading(false));
   }, [range]);
 
-  useEffect(() => {
-    load();
-    const id = setInterval(load, 30_000);
-    return () => clearInterval(id);
-  }, [load]);
+  useEffect(() => load(), [load]);
+  // live numbers: refreshed while somebody is looking, not in a background tab
+  usePolling(load, 30_000);
 
   if (!data) return <div className="spinner" aria-hidden="true" />;
   const nf = new Intl.NumberFormat(lang);

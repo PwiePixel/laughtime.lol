@@ -1,8 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, timeAgo } from '@/lib/api';
+import { useDebouncedValue } from '@/lib/timing';
 import Avatar from '../Avatar';
 import Icon from '../Icon';
 import { useApp } from '../Providers';
@@ -153,15 +154,17 @@ export default function Users() {
   const [q, setQ] = useState('');
   const [users, setUsers] = useState(null);
   const [open, setOpen] = useState(null);
+  // search-as-you-type: one request once the typing pauses
+  const term = useDebouncedValue(q, q ? 300 : 0);
+  // only the answer to the latest question may fill the table
+  const latest = useRef(0);
   const load = useCallback(() => {
-    api(`/api/admin/users?q=${encodeURIComponent(q)}`)
-      .then((d) => setUsers(d.users))
-      .catch(() => setUsers([]));
-  }, [q]);
-  useEffect(() => {
-    const id = setTimeout(load, q ? 300 : 0);
-    return () => clearTimeout(id);
-  }, [load, q]);
+    const ticket = ++latest.current;
+    api(`/api/admin/users?q=${encodeURIComponent(term)}`)
+      .then((d) => ticket === latest.current && setUsers(d.users))
+      .catch(() => ticket === latest.current && setUsers([]));
+  }, [term]);
+  useEffect(() => load(), [load]);
 
   return (
     <div className="admin-users">

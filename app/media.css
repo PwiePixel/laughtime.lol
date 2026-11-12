@@ -1,0 +1,58 @@
+/* ------------------------------------------------------------------
+   Media loading: pictures and clips never pop in or move the layout.
+   A light shimmer holds the place, the media fades in once it is there.
+   (components/MemeCanvas.jsx, MediaThumb in components/PackCard.jsx)
+   ------------------------------------------------------------------ */
+
+/* meme frame: the box already has its final size (aspect-ratio), so only the
+   opacity changes – nothing is laid out again */
+.meme-frame > .meme-media {
+  opacity: 0;
+  transition: opacity var(--dur) var(--ease-out);
+}
+
+.meme-frame.is-loaded > .meme-media {
+  opacity: 1;
+}
+
+/* thumbnails (packs, studio, pickers) */
+.media-thumb > .thumb-img {
+  opacity: 0;
+  transition: opacity var(--dur) var(--ease-out);
+}
+
+.media-thumb > .thumb-img.is-ready {
+  opacity: 1;
+}
+
+.media-thumb.has-media:not(:has(> .thumb-img.is-ready)) {
+  background: linear-gradient(100deg, rgba(255, 255, 255, 0) 30%, rgba(255, 255, 255, 0.1) 50%, rgba(255, 255, 255, 0) 70%) #2a1057;
+  background-size: 200% 100%;
+  animation: media-shimmer 1.4s linear infinite;
+}
+
+@keyframes media-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+
+/* static artwork in modern formats: the <picture> wrapper must not change the layout of its <img> */
+.media-picture {
+  display: contents;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .media-thumb.has-media:not(:has(> .thumb-img.is-ready)) {
+    animation: none;
+    background-position: 50% 0;
+  }
+
+  .meme-frame > .meme-media,
+  .media-thumb > .thumb-img {
+    transition: none;
+  }
+}

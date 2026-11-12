@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { api } from '@/lib/api';
+import { cachedGet, peekCached } from '@/lib/fetchCache';
+import { useDebouncedValue } from '@/lib/timing';
 import Icon from './Icon';
 import PackCard from './PackCard';
 import { useApp } from './Providers';
@@ -13,6 +14,9 @@ export default function PackPicker({ current, onPick, onClose }) {
   const [tab, setTab] = useState(account ? 'mine' : 'public');
   const [query, setQuery] = useState('');
   const [list, setList] = useState(null);
+  // search-as-you-type: one request once the typing pauses (an emptied box answers at once)
+  const term = query.trim();
+  const search = useDebouncedValue(term, term ? 300 : 0);
 
   useEffect(() => {
     const esc = (e) => e.key === 'Escape' && onClose();
@@ -26,17 +30,16 @@ export default function PackPicker({ current, onPick, onClose }) {
       return undefined;
     }
     let alive = true;
-    setList(null);
-    const id = setTimeout(() => {
-      api(`/api/packs?scope=${tab}&q=${encodeURIComponent(query)}&limit=40`)
-        .then((d) => alive && setList(d.items))
-        .catch(() => alive && setList([]));
-    }, query ? 300 : 0);
+    const url = `/api/packs?scope=${tab}&q=${encodeURIComponent(search)}&limit=40`;
+    // a list that was open a moment ago (other tab, same search again) is shown without waiting
+    setList(peekCached(url)?.items ?? null);
+    cachedGet(url, { ttl: 30_000 })
+      .then((d) => alive && setList(d.items))
+      .catch(() => alive && setList((items) => items || []));
     return () => {
       alive = false;
-      clearTimeout(id);
     };
-  }, [tab, query, account]);
+  }, [tab, search, account]);
 
   const choose = (pack) => {
     onPick(pack ? pack.id : null);
@@ -65,7 +68,7 @@ export default function PackPicker({ current, onPick, onClose }) {
         {tab === 'official' && (
           <button type="button" className={`pack-card official ${!current ? 'is-selected' : ''}`} onClick={() => choose(null)}>
             <span className="media-thumb pack-cover official-cover">
-              <img src="/logo-mark.svg" alt="" />
+              <img src="/logo-mark.svg" alt="" width="62" height="30" decoding="async" />
             </span>
             <span className="pack-info">
               <strong className="pack-name">{t('lobby.pack.official')}</strong>

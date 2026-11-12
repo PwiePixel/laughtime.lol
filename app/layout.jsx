@@ -16,6 +16,7 @@ import './news.css';
 import './pwa.css';
 import './beta.css';
 import './activity.css';
+import './media.css';
 
 async function getLang() {
   const store = await cookies();

@@ -1,8 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
-import { api } from '@/lib/api';
+import { useState } from 'react';
+import { useCachedFetch } from '@/lib/fetchCache';
 import Avatar from './Avatar';
 import Icon from './Icon';
 import { useApp } from './Providers';
@@ -15,6 +15,7 @@ const METRICS = [
   { key: 'games', icon: 'gamepad' },
 ];
 const PERIODS = ['week', 'month', 'all'];
+const BOARD_FRESH_MS = 30_000;
 
 export function Podium({ rows, t, nf }) {
   const order = [rows[1], rows[0], rows[2]];
@@ -40,19 +41,10 @@ export default function LeaderboardPage() {
   const { t, lang, account } = useApp();
   const [metric, setMetric] = useState('points');
   const [period, setPeriod] = useState('week');
-  const [rows, setRows] = useState(null);
   const nf = new Intl.NumberFormat(lang);
-
-  useEffect(() => {
-    let alive = true;
-    setRows(null);
-    api(`/api/leaderboard?metric=${metric}&period=${period}`)
-      .then((d) => alive && setRows(d.rows))
-      .catch(() => alive && setRows([]));
-    return () => {
-      alive = false;
-    };
-  }, [metric, period]);
+  // every metric/period is kept for a moment: switching back and forth paints at once
+  const board = useCachedFetch(`/api/leaderboard?metric=${metric}&period=${period}`, { ttl: BOARD_FRESH_MS });
+  const rows = board.data?.rows ?? (board.error ? [] : null);
 
   return (
     <div className="page-wide leaderboard-page">
