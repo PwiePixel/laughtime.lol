@@ -1,0 +1,26 @@
+# Cloudflare Tunnel for LaughTime.lol – example configuration
+#
+# install.sh writes this file as /etc/cloudflared/<tunnel name>.yml (with
+# systemd) or ~/.cloudflared/<tunnel name>.yml (with PM2). For a manual setup:
+#
+#   cloudflared tunnel login                       # choose the zone of your domain
+#   cloudflared tunnel create laughtime            # prints the tunnel id
+#   cloudflared tunnel route dns --overwrite-dns laughtime laughtime.lol
+#   cloudflared tunnel --config /etc/cloudflared/laughtime.yml run
+#
+# Main page and beta are served by the same LaughTime instance - the app tells
+# them apart by the Host header, which the tunnel passes on unchanged.
+# WebSockets (/ws) work through the tunnel without extra settings.
+
+tunnel: 00000000-0000-0000-0000-000000000000
+credentials-file: /etc/cloudflared/00000000-0000-0000-0000-000000000000.json
+
+ingress:
+  - hostname: laughtime.lol
+    service: http://localhost:3000
+  - hostname: www.laughtime.lol
+    service: http://localhost:3000
+  - hostname: beta.laughtime.lol
+    service: http://localhost:3000
+  # mandatory last rule: everything else is answered with 404
+  - service: http_status:404

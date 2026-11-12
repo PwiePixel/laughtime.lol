@@ -1,0 +1,47 @@
+# Cloudflare Tunnel for LaughTime.lol – systemd unit (template)
+#
+# install.sh replaces the @PLACEHOLDERS@ and installs the result as
+# /etc/systemd/system/cloudflared-<tunnel name>.service. It is separate from
+# the stock cloudflared.service on purpose, so another tunnel on the same
+# server keeps working.
+#
+# Managed by the LaughTime installer (install.sh) – changes to the installed
+# copy are overwritten on the next run.
+
+[Unit]
+Description=Cloudflare Tunnel for LaughTime.lol (@TUNNEL_NAME@)
+Documentation=https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+# updates come from the package manager or the installer, not from the daemon itself
+ExecStart="@CLOUDFLARED@" --no-autoupdate tunnel --config "@CONFIG@" run
+Restart=always
+RestartSec=5
+KillSignal=SIGTERM
+TimeoutStopSec=30
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=cloudflared-@TUNNEL_NAME@
+
+# The tunnel only opens outgoing connections and reads its config and
+# credentials from /etc/cloudflared - it needs no write access anywhere.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+LockPersonality=true
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

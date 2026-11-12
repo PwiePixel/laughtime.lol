@@ -1,0 +1,63 @@
+# LaughTime.lol – systemd unit (template)
+#
+# install.sh replaces the @PLACEHOLDERS@ and installs the result as
+# /etc/systemd/system/laughtime.service. For a manual setup replace them
+# yourself, then: systemctl daemon-reload && systemctl enable --now laughtime
+#
+# Managed by the LaughTime installer (install.sh) – changes to the installed
+# copy are overwritten on the next run.
+
+[Unit]
+Description=LaughTime.lol – multiplayer meme party game
+Documentation=https://laughtime.lol
+After=network-online.target
+Wants=network-online.target
+# never give up restarting, however often the app stops
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=@USER@
+Group=@GROUP@
+WorkingDirectory=@APP_DIR@
+Environment=NODE_ENV=production
+# index.js calls npm on the first start, so the Node.js folder has to be on the PATH
+Environment=PATH=@PATH@
+@PORT_ENV@
+ExecStart="@NODE@" "@APP_DIR@/index.js"
+Restart=always
+RestartSec=5
+KillSignal=SIGTERM
+TimeoutStopSec=20
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=laughtime
+# every player holds a WebSocket connection
+LimitNOFILE=65536
+
+# Hardening. The app has to write to its own folder (data/, .next/,
+# node_modules/) and npm needs the home directory of the service user for its
+# cache - so there is no ProtectHome here and no MemoryDenyWriteExecute
+# (the JavaScript engine compiles code at runtime).
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=full
+ReadWritePaths=@APP_DIR@
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+RestrictNamespaces=true
+LockPersonality=true
+SystemCallArchitectures=native
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
+CapabilityBoundingSet=@CAPS@
+AmbientCapabilities=@CAPS@
+
+[Install]
+WantedBy=multi-user.target
