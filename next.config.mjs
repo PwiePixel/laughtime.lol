@@ -15,8 +15,10 @@ const nextConfig = (phase) => ({
   // the custom server (server/) is plain Node and not part of the Next bundle
   outputFileTracingExcludes: { '*': ['./data/**'] },
   experimental: {
-    // only the icons and SDK parts that are really imported end up in the bundles
-    optimizePackageImports: ['lucide-react', '@discord/embedded-app-sdk'],
+    // The Discord SDK is one big barrel file: with this only the parts the
+    // activity really imports end up in its (on-demand) chunk – about 28 kB less.
+    // lucide-react needs no entry, Next optimises its imports out of the box.
+    optimizePackageImports: ['@discord/embedded-app-sdk'],
   },
   async headers() {
     return [
