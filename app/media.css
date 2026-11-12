@@ -40,6 +40,34 @@
   }
 }
 
+/* Pages that fill up once their data has arrived keep the footer below the
+   fold from the start. Otherwise it sits at the bottom of the screen while the
+   page loads and is pushed away when the list appears. */
+.gallery-page,
+.leaderboard-page,
+.profile-page,
+.meme-page,
+.pack-page,
+.studio-page,
+.page-loading {
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+/* studio: the editor of the open pack arrives after two requests – this box
+   holds its place (about as tall as the editor of an empty pack) */
+.pack-editor.is-placeholder {
+  display: grid;
+  place-items: center;
+  min-height: 330px;
+}
+
+@media (max-width: 720px) {
+  .pack-editor.is-placeholder {
+    min-height: 480px;
+  }
+}
+
 /* static artwork in modern formats: the <picture> wrapper must not change the layout of its <img> */
 .media-picture {
   display: contents;

@@ -56,7 +56,7 @@ export default function ProfilePage({ username }) {
       </div>
     );
   }
-  if (!data) return <div className="page-center">{t('common.loading')}</div>;
+  if (!data) return <div className="page-center page-loading">{t('common.loading')}</div>;
 
   const { user, stats, memes } = data;
   const nf = new Intl.NumberFormat(lang);

@@ -1,8 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, timeAgo } from '@/lib/api';
+import { usePolling } from '@/lib/fetchCache';
 import Avatar from '../Avatar';
 import Icon from '../Icon';
 import MemeCanvas from '../MemeCanvas';
@@ -81,7 +82,7 @@ function Group({ g, onChanged }) {
             {r.comment && <p className="rg-comment">{t('quote', { s: r.comment })}</p>}
             {r.context?.media && (
               <div className="rg-evidence">
-                <MemeCanvas media={r.context.media} captions={r.context.captions || []} maxHeight="180px" />
+                <MemeCanvas media={r.context.media} captions={r.context.captions || []} maxHeight="180px" lazy />
               </div>
             )}
           </li>
@@ -96,19 +97,21 @@ export default function Reports({ onCount }) {
   const { t } = useApp();
   const [status, setStatus] = useState('open');
   const [groups, setGroups] = useState(null);
+  // switching between open and done quickly: only the answer to the latest question counts
+  const latest = useRef(0);
   const load = useCallback(() => {
+    const ticket = ++latest.current;
     api(`/api/admin/reports?status=${status}`)
       .then((d) => {
+        if (ticket !== latest.current) return;
         setGroups(d.groups);
         if (status === 'open') onCount?.(d.groups.length);
       })
-      .catch(() => setGroups([]));
+      .catch(() => ticket === latest.current && setGroups([]));
   }, [status, onCount]);
-  useEffect(() => {
-    load();
-    const id = setInterval(load, 20_000);
-    return () => clearInterval(id);
-  }, [load]);
+  useEffect(() => load(), [load]);
+  // new reports show up on their own while somebody is looking, not in a background tab
+  usePolling(load, 20_000);
 
   return (
     <div className="admin-reports">

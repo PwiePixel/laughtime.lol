@@ -548,8 +548,13 @@ export default function StudioPage() {
             )}
             {current ? (
               <PackEditor pack={current} onChange={updateCurrent} onDelete={del} onRemove={remove} />
-            ) : (
+            ) : error ? (
               packs?.length > 0 && <div className="card">{t('studio.selectPack')}</div>
+            ) : (
+              // the pack is on its way: its place is held, so upload and search below do not jump
+              <section className="card pack-editor is-placeholder" aria-hidden="true">
+                <div className="spinner" />
+              </section>
             )}
             <UploadCard pack={current} onUploaded={updateCurrent} />
             <SearchPanel pack={current} onAdd={add} busyId={busyId} />

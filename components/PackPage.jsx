@@ -21,7 +21,7 @@ export default function PackPage({ id }) {
 
   if (pack === undefined) {
     return (
-      <div className="page-center">
+      <div className="page-center page-loading">
         <div className="spinner" aria-hidden="true" />
       </div>
     );

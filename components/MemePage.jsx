@@ -50,7 +50,7 @@ export default function MemePage({ id }) {
       </div>
     );
   }
-  if (!meme) return <div className="page-center">{t('common.loading')}</div>;
+  if (!meme) return <div className="page-center page-loading">{t('common.loading')}</div>;
 
   async function share() {
     const url = activity ? `${activity.publicUrl}/m/${meme.id}` : window.location.href;
