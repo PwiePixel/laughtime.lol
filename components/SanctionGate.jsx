@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { ViewTransition } from 'react';
 import { OPERATOR } from '@/lib/operator';
 import Icon from './Icon';
 import { useApp } from './Providers';
@@ -73,7 +74,8 @@ export default function SanctionGate({ children }) {
           <Icon name="flag" size={18} /> {t('mod.restrictedBanner', { reason: t(`mod.reason.${sanction.reason}`) })} · {sanctionUntil(t, lang, sanction)}
         </p>
       )}
-      {children}
+      {/* page changes cross-fade where the browser supports view transitions (look: app/v2.css) */}
+      <ViewTransition default="v2-page">{children}</ViewTransition>
     </>
   );
 }

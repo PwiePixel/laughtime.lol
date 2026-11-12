@@ -121,28 +121,53 @@
 }
 
 .hero-logo {
-  display: block;
   width: min(440px, 92%);
-  height: auto;
   margin: 0 0 4px -10px;
-  filter: drop-shadow(0 10px 18px rgba(0, 0, 0, 0.25));
 }
 
-/* --- animated LoL logo: every letter bounces on its own ------------------ */
+/* soft floor shadow – a static gradient instead of a filter on the moving logo */
+.hero-logo::before {
+  content: '';
+  position: absolute;
+  inset: 84% 6% -9% 4%;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(8, 2, 22, 0.5), transparent);
+  pointer-events: none;
+}
+
+/* --- animated LoL logo: every letter bounces on its own ------------------
+   The parts are HTML boxes (see components/LolLogo.jsx), so these transforms
+   run on the compositor. */
 .lol-anim {
-  overflow: visible;
+  position: relative;
+  display: block;
   aspect-ratio: 620 / 300;
+  /* hover follows the artwork, not the boxes around it */
+  pointer-events: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.lol-anim svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.lol-anim svg :is(path, circle, rect, ellipse) {
+  pointer-events: auto;
 }
 
 .lol-anim .lol-part,
 .lol-anim .lol-star,
 .lol-anim .lol-face {
-  transform-box: fill-box;
+  position: absolute;
   transform-origin: 50% 100%;
 }
 
 .lol-anim .lol-part {
-  animation: lol-bounce 2.8s cubic-bezier(0.3, 0, 0.3, 1) infinite;
+  animation: lol-bounce 3s linear infinite;
   cursor: pointer;
 }
 
@@ -151,57 +176,73 @@
 }
 
 .lol-anim .lol-o {
-  animation-delay: 0.18s;
+  animation-delay: 0.14s;
 }
 
 .lol-anim .lol-l2 {
-  animation-delay: 0.36s;
+  animation-delay: 0.28s;
 }
 
 /* the face also giggles while it jumps */
 .lol-anim .lol-face {
   transform-origin: 50% 50%;
-  animation: lol-giggle 2.8s ease-in-out 0.18s infinite;
+  animation: lol-giggle 3s ease-in-out 0.14s infinite;
 }
 
 .lol-anim .lol-star {
   transform-origin: 50% 50%;
-  animation: lol-twinkle 2.2s ease-in-out infinite;
+  animation: lol-twinkle 2.4s ease-in-out infinite;
 }
 
 .lol-anim .st2 {
-  animation-delay: 0.7s;
+  animation-delay: 0.8s;
 }
 
 .lol-anim .st3 {
-  animation-delay: 1.3s;
+  animation-delay: 1.5s;
 }
 
 /* hover a letter: it does an extra hop */
-.lol-anim .lol-part:hover {
-  animation: lol-hop 0.55s cubic-bezier(0.3, 0, 0.3, 1);
+@media (hover: hover) {
+  .lol-anim .lol-part:hover {
+    animation: lol-hop 0.6s var(--ease-out, ease-out);
+  }
 }
 
+/* scrolled out of view (set by LolLogo) or covered by a dialog */
+.lol-anim.is-paused :is(.lol-part, .lol-face, .lol-star),
+body:has(.modal-backdrop) .lol-anim :is(.lol-part, .lol-face, .lol-star) {
+  animation-play-state: paused;
+}
+
+/* squash, jump, hang, land, settle: every step has its own easing so the
+   letters leave the ground fast and fall like something with weight */
 @keyframes lol-bounce {
   0%,
-  55%,
+  56%,
   100% {
     transform: translateY(0) scale(1, 1);
+    animation-timing-function: ease-in-out;
   }
-  8% {
-    transform: translateY(0) scale(1.08, 0.9);
+  7% {
+    transform: translateY(0) scale(1.1, 0.88);
+    animation-timing-function: cubic-bezier(0.2, 0.8, 0.3, 1);
   }
-  20% {
-    transform: translateY(-22%) scale(0.94, 1.08);
+  23% {
+    transform: translateY(-24%) scale(0.94, 1.07);
+    animation-timing-function: cubic-bezier(0.6, 0, 0.9, 0.6);
   }
-  30% {
-    transform: translateY(-24%) scale(0.97, 1.04);
+  37% {
+    transform: translateY(0) scale(1.13, 0.85);
+    animation-timing-function: cubic-bezier(0.2, 0.8, 0.3, 1);
   }
-  40% {
-    transform: translateY(0) scale(1.12, 0.86);
+  44% {
+    transform: translateY(-5%) scale(0.97, 1.04);
+    animation-timing-function: ease-in;
   }
-  47% {
-    transform: translateY(-5%) scale(0.98, 1.03);
+  50% {
+    transform: translateY(0) scale(1.04, 0.97);
+    animation-timing-function: ease-out;
   }
 }
 
@@ -209,11 +250,11 @@
   0% {
     transform: scale(1.1, 0.88);
   }
-  45% {
+  40% {
     transform: translateY(-20%) scale(0.92, 1.1) rotate(-6deg);
   }
-  80% {
-    transform: translateY(0) scale(1.08, 0.92);
+  72% {
+    transform: translateY(0) scale(1.1, 0.9);
   }
   100% {
     transform: none;
@@ -225,19 +266,19 @@
   100% {
     transform: rotate(0deg);
   }
-  15% {
+  14% {
     transform: rotate(-9deg);
   }
-  25% {
+  23% {
     transform: rotate(8deg);
   }
-  35% {
+  32% {
     transform: rotate(-6deg);
   }
-  45% {
+  41% {
     transform: rotate(4deg);
   }
-  55% {
+  52% {
     transform: rotate(0deg);
   }
 }

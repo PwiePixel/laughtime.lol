@@ -1906,20 +1906,34 @@ textarea.input {
   pointer-events: none;
   overflow: hidden;
   z-index: 30;
+  /* nothing in here changes the page around it */
+  contain: strict;
 }
 
+/* one piece = one compositor layer that only moves (see components/Confetti.jsx) */
 .confetti span {
   position: absolute;
-  top: -20px;
+  top: -24px;
+  left: var(--x, 50%);
+  width: var(--w, 10px);
+  height: var(--h, 5px);
   border-radius: 2px;
-  animation-name: fall;
-  animation-timing-function: linear;
-  animation-fill-mode: forwards;
+  background: var(--c, #ffd23f);
+  opacity: 0;
+  animation: fall var(--dur, 3s) cubic-bezier(0.3, 0.1, 0.7, 1) var(--delay, 0s) both;
 }
 
 @keyframes fall {
-  to {
-    transform: translate(40px, 105vh) rotate(720deg);
+  0% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) rotate(var(--tilt, 0deg));
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(var(--drift, 40px), calc(100vh + 48px), 0) rotate(calc(var(--tilt, 0deg) + var(--spin, 720deg)));
   }
 }
 

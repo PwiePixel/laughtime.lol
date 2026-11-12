@@ -15,7 +15,7 @@ export default function StreamerToggle({ compact = false }) {
       aria-label={compact ? label : undefined}
       onClick={() => setStreamerMode(!streamerMode)}
     >
-      <Icon name={streamerMode ? 'eye-off' : 'eye'} size={compact ? 15 : 18} />
+      <Icon name={streamerMode ? 'eye-off' : 'eye'} size={compact ? 16 : 18} />
       {!compact && <span>{label}</span>}
     </button>
   );

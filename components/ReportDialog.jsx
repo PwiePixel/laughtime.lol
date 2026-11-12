@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { api } from '@/lib/api';
 import { loadProfile } from '@/lib/profile';
 import Avatar from './Avatar';
 import Icon from './Icon';
 import { useApp } from './Providers';
+import useDialog from './ui/useDialog';
 
 const REASONS = {
   player: ['name', 'harassment', 'spam', 'other'],
@@ -23,12 +24,12 @@ export default function ReportDialog({ target, send, onClose }) {
   const [state, setState] = useState('idle'); // idle | busy | done
   const [error, setError] = useState('');
   const reasons = REASONS[target.kind] || REASONS.player;
+  // focus trap, Escape and the closing animation
+  const { ref, closing, close } = useDialog(onClose);
+  const titleId = useId();
+  const doneTimer = useRef(null);
 
-  useEffect(() => {
-    const esc = (e) => e.key === 'Escape' && onClose();
-    document.addEventListener('keydown', esc);
-    return () => document.removeEventListener('keydown', esc);
-  }, [onClose]);
+  useEffect(() => () => clearTimeout(doneTimer.current), []);
 
   async function submit(e) {
     e.preventDefault();
@@ -38,7 +39,7 @@ export default function ReportDialog({ target, send, onClose }) {
     try {
       await send(reason, comment.trim());
       setState('done');
-      setTimeout(onClose, 1800);
+      doneTimer.current = setTimeout(close, 1800);
     } catch (err) {
       const key = `err.${err.code || err.message}`;
       setError(t(key) === key ? t('err.network') : t(key));
@@ -47,18 +48,27 @@ export default function ReportDialog({ target, send, onClose }) {
   }
 
   return (
-    <div className="modal-backdrop" onClick={onClose} role="presentation">
-      <form className="card modal report-dialog pop-in" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()} onSubmit={submit}>
+    <div className={`modal-backdrop ${closing ? 'is-closing' : ''}`} onClick={close} role="presentation">
+      <form
+        ref={ref}
+        className="card modal report-dialog pop-in"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
+        onClick={(e) => e.stopPropagation()}
+        onSubmit={submit}
+      >
         <div className="picker-head">
-          <h2>
+          <h2 id={titleId}>
             <Icon name="flag" /> {target.kind === 'meme' ? t('report.memeTitle') : t('report.playerTitle')}
           </h2>
-          <button type="button" className="icon-btn" onClick={onClose} aria-label={t('games.close')}>
+          <button type="button" className="icon-btn" onClick={close} aria-label={t('games.close')}>
             <Icon name="x" />
           </button>
         </div>
         {state === 'done' ? (
-          <div className="report-done">
+          <div className="report-done" role="status">
             <div className="big-icon is-green">
               <Icon name="check-circle" size={48} />
             </div>
@@ -73,7 +83,7 @@ export default function ReportDialog({ target, send, onClose }) {
               </p>
             )}
             <span className="label">{t('report.why')}</span>
-            <div className="report-reasons" role="radiogroup">
+            <div className="report-reasons" role="radiogroup" aria-label={t('report.why')}>
               {reasons.map((r) => (
                 <button
                   key={r}
@@ -99,14 +109,18 @@ export default function ReportDialog({ target, send, onClose }) {
               placeholder={t('report.commentPlaceholder')}
               onChange={(e) => setComment(e.target.value)}
             />
-            {error && <p className="form-error">{error}</p>}
+            {error && (
+              <p className="form-error" role="alert">
+                {error}
+              </p>
+            )}
             <p className="muted small">{t('report.hint')}</p>
             <div className="row-end">
-              <button type="button" className="btn btn-white" onClick={onClose}>
+              <button type="button" className="btn btn-white" onClick={close}>
                 {t('common.cancel')}
               </button>
-              <button type="submit" className="btn btn-pink" disabled={!reason || state === 'busy'}>
-                <Icon name="flag" size={18} /> {t('report.send')}
+              <button type="submit" className="btn btn-pink" disabled={!reason || state === 'busy'} aria-busy={state === 'busy'}>
+                {state === 'busy' ? <span className="spinner small" aria-hidden="true" /> : <Icon name="flag" size={18} />} {t('report.send')}
               </button>
             </div>
           </>
