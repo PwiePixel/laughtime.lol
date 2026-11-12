@@ -2103,6 +2103,13 @@ button.strip-player {
 
 /* narrow phones: the notice itself fits one line, its label is read out only */
 @media (max-width: 420px) {
+  /* invite buttons: side by side when the labels fit, else one per row - never a label on two lines */
+  .invite-actions .btn {
+    flex: 1 1 auto;
+    padding-inline: 12px;
+    white-space: nowrap;
+  }
+
   .last-call {
     font-size: 0.86rem;
   }
