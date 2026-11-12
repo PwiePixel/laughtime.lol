@@ -171,6 +171,8 @@ export async function startServer({ dev = false, dir = ROOT } = {}) {
       // Discord Activity: "/?frame_id=…" (how Discord opens it) and /activity may be framed by Discord
       const framePolicy = activityFramePolicy(p, url.searchParams);
       if (framePolicy) res.setHeader('Content-Security-Policy', framePolicy);
+      // installable web app: browsers must always get the newest worker and manifest
+      if (p === '/sw.js' || p === '/manifest.json') res.setHeader('Cache-Control', 'no-cache');
       return await handle(req, res);
     } catch (err) {
       console.error('[http]', err);

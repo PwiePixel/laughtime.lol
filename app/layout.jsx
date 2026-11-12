@@ -31,6 +31,10 @@ export async function generateMetadata() {
     title: { default: translate(lang, 'meta.title'), template: '%s · laughtime.lol' },
     description: translate(lang, 'meta.description'),
     applicationName: 'LaughTime',
+    // installable web app (public/manifest.json, worker: public/sw.js)
+    manifest: '/manifest.json',
+    appleWebApp: { capable: true, title: 'LaughTime', statusBarStyle: 'black-translucent' },
+    formatDetection: { telephone: false },
     openGraph: {
       title: translate(lang, 'meta.title'),
       description: translate(lang, 'meta.description'),
@@ -53,6 +57,8 @@ export const viewport = {
   themeColor: '#1E0B40',
   width: 'device-width',
   initialScale: 1,
+  // use the whole screen of phones with a notch (app/pwa.css keeps content out of it)
+  viewportFit: 'cover',
 };
 
 export default async function RootLayout({ children }) {

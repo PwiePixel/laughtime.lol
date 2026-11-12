@@ -1,0 +1,63 @@
+{
+  "name": "LaughTime",
+  "short_name": "LaughTime",
+  "description": "The meme party game: caption memes and short clips with your friends, vote for the funniest and win the room.",
+  "id": "/",
+  "start_url": "/?source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "portrait",
+  "theme_color": "#1E0B40",
+  "background_color": "#1E0B40",
+  "lang": "en",
+  "dir": "ltr",
+  "categories": ["games", "entertainment", "social"],
+  "prefer_related_applications": false,
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "/icons/monochrome-192.png", "sizes": "192x192", "type": "image/png", "purpose": "monochrome" }
+  ],
+  "shortcuts": [
+    {
+      "name": "Quick play",
+      "short_name": "Quick play",
+      "description": "Find a public game right away",
+      "url": "/play?game=classic&source=pwa-shortcut",
+      "icons": [
+        { "src": "/icons/shortcut-quick-96.png", "sizes": "96x96", "type": "image/png" },
+        { "src": "/icons/shortcut-quick-192.png", "sizes": "192x192", "type": "image/png" }
+      ]
+    },
+    {
+      "name": "Private game",
+      "short_name": "Private game",
+      "description": "Open a room for your friends",
+      "url": "/?shortcut=private&source=pwa-shortcut",
+      "icons": [
+        { "src": "/icons/shortcut-private-96.png", "sizes": "96x96", "type": "image/png" },
+        { "src": "/icons/shortcut-private-192.png", "sizes": "192x192", "type": "image/png" }
+      ]
+    },
+    {
+      "name": "Best memes",
+      "short_name": "Best memes",
+      "description": "The funniest memes of the community",
+      "url": "/memes?source=pwa-shortcut",
+      "icons": [
+        { "src": "/icons/shortcut-memes-96.png", "sizes": "96x96", "type": "image/png" },
+        { "src": "/icons/shortcut-memes-192.png", "sizes": "192x192", "type": "image/png" }
+      ]
+    }
+  ],
+  "screenshots": [
+    { "src": "/screenshots/home-narrow.png", "sizes": "780x1688", "type": "image/png", "form_factor": "narrow", "label": "Start a game in seconds" },
+    { "src": "/screenshots/caption-narrow.png", "sizes": "780x1688", "type": "image/png", "form_factor": "narrow", "label": "Write the funniest caption" },
+    { "src": "/screenshots/memes-narrow.png", "sizes": "780x1688", "type": "image/png", "form_factor": "narrow", "label": "The best memes of the community" },
+    { "src": "/screenshots/home-wide.png", "sizes": "1280x800", "type": "image/png", "form_factor": "wide", "label": "LaughTime on the big screen" },
+    { "src": "/screenshots/lobby-wide.png", "sizes": "1280x800", "type": "image/png", "form_factor": "wide", "label": "Invite your friends with a code" }
+  ]
+}
