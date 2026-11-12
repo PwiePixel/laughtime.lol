@@ -305,6 +305,7 @@ env_get() {   # <key> [file]
     printf '%s' "$v"
     return 0
   done <"$file"
+  return 0
 }
 
 state_get() { env_get "$1" "$STATE_FILE"; }
@@ -669,10 +670,12 @@ node_ok() {   # [binary]
 # a new Node.js is useless while an old one comes first on the PATH (nvm,
 # leftovers in /usr/local): put the folder of the good one in front
 prefer_good_node() {
-  local dir
+  local dir dirs
   hash -r
   node_ok node && return 0
-  for dir in "$(dst /usr/local)/bin" /usr/local/bin /usr/bin; do
+  dirs=("$(dst /usr/local)/bin")
+  [[ -n "$ROOT_PREFIX" ]] || dirs+=(/usr/bin)
+  for dir in "${dirs[@]}"; do
     if node_ok "$dir/node"; then PATH="$dir:$PATH"; hash -r; return 0; fi
   done
   return 1
@@ -682,7 +685,7 @@ mem_available_mb() {
   awk '/^MemAvailable:/ { a = $2 } /^SwapFree:/ { s = $2 } END { printf "%d", (a + s) / 1024 }' /proc/meminfo 2>/dev/null || printf '0'
 }
 
-disk_free_mb() { df -Pm "$1" 2>/dev/null | awk 'NR == 2 { print $4 }'; }
+disk_free_mb() { df -Pm "$1" 2>/dev/null | awk 'NR == 2 { print $4 }' || true; }
 
 # ---------------------------------------------------------------------------
 # packages
@@ -726,7 +729,7 @@ download() {  # <url> <target file>
 # step: system check
 # ---------------------------------------------------------------------------
 step_system() {
-  local mem disk
+  local mem disk file
   step 'System check'
   ok "System: $OS_NAME, $ARCH${PKG:+, package manager $PKG}"
   [[ "$ARCH" != unsupported* ]] || warn "CPU architecture $ARCH is not tested – downloads of Node.js and cloudflared will not work, system packages might."
@@ -739,6 +742,16 @@ step_system() {
     ok "Running as $CURRENT_USER – system changes (packages, services, files below /etc) use sudo"
   fi
   if [[ "$INIT" == systemd ]]; then ok 'Init system: systemd'; else ok 'Init system: no systemd as PID 1 – services run with PM2'; fi
+
+  # a half-copied project is noticed here, not after ten minutes of work
+  for file in index.js package.json server/server.js; do
+    [[ -f "$APP_DIR/$file" ]] || die "The project folder is incomplete: $file is missing. Copy or clone the whole project again."
+  done
+  if [[ "$MANAGER" == systemd ]]; then
+    for file in deploy/laughtime.service deploy/cloudflared-laughtime.service; do
+      [[ -r "$APP_DIR/$file" ]] || die "The project folder is incomplete: $file is missing. Copy or clone the whole project again."
+    done
+  fi
 
   mem=$(mem_available_mb)
   disk=$(disk_free_mb "$APP_DIR")
@@ -896,11 +909,13 @@ install_node() {
 
 step_node() {
   step 'Node.js'
-  if node_ok node && have npm; then
-    ok "Node.js $(node -v) is installed and has the built-in SQLite"
+  local found=''
+  if have node; then found=$(node -v 2>/dev/null || echo '?'); fi
+  if prefer_good_node && have npm; then
+    ok "Node.js $(node -v) is installed and has the built-in SQLite ($(command -v node))"
   else
-    if have node; then
-      note "Found Node.js $(node -v 2>/dev/null || echo '?'), but LaughTime needs $MIN_NODE_TEXT or newer (built-in SQLite)."
+    if [[ -n "$found" ]]; then
+      note "Found Node.js $found, but LaughTime needs $MIN_NODE_TEXT or newer (built-in SQLite)."
     else
       info "Node.js is not installed – installing the current LTS release (needed: $MIN_NODE_TEXT or newer)."
     fi
@@ -1161,7 +1176,7 @@ install_file() {   # <real path> <mode> <content>
 
 render_app_unit() {
   local tpl caps='' port_env='# the port comes from .env (SERVER_PORT / PORT)'
-  tpl=$(<"$APP_DIR/deploy/laughtime.service")
+  tpl=$(<"$APP_DIR/deploy/laughtime.service") || return 1
   # ports below 1024 need a capability when the app does not run as root
   (( PORT >= 1024 )) || caps='CAP_NET_BIND_SERVICE'
   (( ! PORT_OVERRIDE )) || port_env="Environment=SERVER_PORT=$PORT"
@@ -1177,7 +1192,7 @@ render_app_unit() {
 
 render_tunnel_unit() {
   local tpl
-  tpl=$(<"$APP_DIR/deploy/cloudflared-laughtime.service")
+  tpl=$(<"$APP_DIR/deploy/cloudflared-laughtime.service") || return 1
   tpl=${tpl//@TUNNEL_NAME@/$TUNNEL_NAME}
   tpl=${tpl//@CLOUDFLARED@/$CLOUDFLARED_BIN}
   tpl=${tpl//@CONFIG@/$CF_CONFIG}
@@ -1305,13 +1320,14 @@ wait_for_http() {   # <url> <timeout seconds> <label> [extra curl options...]
 }
 
 step_service() {
-  local restart=0 health="http://$LOCAL_HOST:$PORT/api/status"
+  local restart=0 health="http://$LOCAL_HOST:$PORT/api/status" unit
   step "Process manager ($MANAGER)"
   if (( DEPS_CHANGED || BUILD_CHANGED )) || [[ "$MODE" == update ]]; then restart=1; fi
 
   if [[ "$MANAGER" == systemd ]]; then
     [[ "$APP_DIR" =~ ^/[A-Za-z0-9_./@+,-]*$ ]] || die "The project path \"$APP_DIR\" contains characters a systemd unit cannot handle safely (spaces, quotes, …). Move the project, e.g. to /opt/laughtime."
-    systemd_apply "$SERVICE_NAME" "$(render_app_unit)" "$restart" || {
+    unit=$(render_app_unit) || die 'Could not read the unit template deploy/laughtime.service.'
+    systemd_apply "$SERVICE_NAME" "$unit" "$restart" || {
       show_app_logs
       die "Could not start $SERVICE_NAME – see the log lines above (${SUDO_HINT}journalctl -u ${SERVICE_NAME%.service} -e)."
     }
@@ -1652,11 +1668,12 @@ cf_dns() {
 }
 
 cf_service() {   # <restart needed 0|1>
-  local restart=$1 target
+  local restart=$1 target unit
   target=$(dst "$CF_CONFIG")
   case "$MANAGER" in
     systemd)
-      systemd_apply "$TUNNEL_UNIT" "$(render_tunnel_unit)" "$restart" || {
+      unit=$(render_tunnel_unit) || die 'Could not read the unit template deploy/cloudflared-laughtime.service.'
+      systemd_apply "$TUNNEL_UNIT" "$unit" "$restart" || {
         as_root journalctl -u "$TUNNEL_UNIT" -n 20 --no-pager 2>&1 | sed 's/^/      /' >&2 || true
         die "Could not start $TUNNEL_UNIT (${SUDO_HINT}journalctl -u ${TUNNEL_UNIT%.service} -e)."
       }
@@ -1838,9 +1855,15 @@ uninstall() {
   step 'Uninstall'
   info 'Removes the services and the tunnel configuration of this installation.'
   info "Kept: .env, data/, the build, Node.js, cloudflared and the tunnel \"$TUNNEL_NAME\" in your Cloudflare account."
-  if ! confirm 'Remove the LaughTime services from this server?' n && (( INTERACTIVE )); then
-    info 'Nothing was changed.'
-    return 0
+  if (( ! ASSUME_YES )); then
+    if (( ! INTERACTIVE )); then
+      err 'No terminal to ask for confirmation – run: bash install.sh --uninstall --yes'
+      exit 1
+    fi
+    if ! confirm 'Remove the LaughTime services from this server?' n; then
+      info 'Nothing was changed.'
+      return 0
+    fi
   fi
 
   for unit in "$SERVICE_NAME" "$TUNNEL_UNIT"; do

@@ -320,3 +320,17 @@ test('a separate service account owns and runs the project', { skip: skip || (!o
   assert.match(refused.out, /cannot reach/);
   assert.equal(fs.statSync(closed.project).uid, 0);
 });
+
+test('uninstall needs a clear yes, a broken checkout is noticed early', { skip }, (t) => {
+  const box = sandbox(t);
+  const refused = box.run(['--uninstall']);
+  assert.equal(refused.code, 1, refused.out);
+  assert.match(refused.out, /--uninstall --yes/);
+
+  fs.rmSync(path.join(box.project, 'deploy', 'laughtime.service'));
+  const broken = box.run(FULL(box));
+  assert.equal(broken.code, 1, broken.out);
+  assert.match(broken.out, /deploy\/laughtime\.service is missing/);
+  assert.equal(fs.existsSync(path.join(box.project, '.env')), false, 'work started in an incomplete project');
+  assert.deepEqual(fs.readdirSync(box.root), []);
+});
