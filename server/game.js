@@ -1462,8 +1462,11 @@ function handleHello(ws, msg) {
   if (room.phase === 'caption' && room.current && !room.current.subs.has(pid) && room.deadline - now() > lateJoinMs(room)) {
     joinRound(room, player);
   }
-  if (room.phase === 'caption' && room.current?.subs.has(pid) && !room.current.subs.get(pid).submitted) cancelEarlyEnd(room);
-  if (room.phase === 'upload' && !room.current?.contribs.has(pid)) cancelEarlyUploadEnd(room);
+  // Somebody who is not done is back: the others wait again. Not for an away player - the early
+  // end ignores them anyway, and cancelling it would start its countdown anew with every hello.
+  const waitedFor = !(paced(room) && player.away);
+  if (waitedFor && room.phase === 'caption' && room.current?.subs.has(pid) && !room.current.subs.get(pid).submitted) cancelEarlyEnd(room);
+  if (waitedFor && room.phase === 'upload' && !room.current?.contribs.has(pid)) cancelEarlyUploadEnd(room);
   if (paced(room)) {
     // with this player back the others may be far enough for a last call
     maybeEndCaptionEarly(room);

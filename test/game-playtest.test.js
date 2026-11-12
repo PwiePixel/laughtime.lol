@@ -247,3 +247,53 @@ test('one connection has one vote per meme, whatever it calls itself', async () 
   if (!guest.state.vote.isMine) guest.send({ t: 'vote', score: 1 });
   assert.equal(host.state.vote.votes, 1);
 });
+
+for (const mode of ['same', 'swap']) {
+  const phase = mode === 'swap' ? 'upload' : 'caption';
+  test(`pacing: an away player who keeps saying hello cannot hold the ${phase} phase open`, async () => {
+    const { players, host, code } = await env.room(3, { game: mode, channel: 'beta', settings: { rounds: 2, captionTime: 30, uploadTime: 30 } });
+    const [ann, ben, cleo] = players;
+    const ready = () => {
+      for (const p of [ann, ben]) p.send(mode === 'swap' ? { t: 'swap_random' } : { t: 'submit', captions: caption(p.name) });
+    };
+    await env.start(host);
+    // round 1: Cleo does nothing at all and is away from then on
+    ready();
+    await env.advance(30_000);
+    if (mode === 'swap') {
+      for (const p of [ann, ben]) p.send({ t: 'submit', captions: caption(p.name) });
+      await env.advance(30_000);
+    }
+    while (ann.state.phase === 'vote') {
+      await rate([ann, ben]);
+      await env.advance(3500);
+    }
+    assert.equal(ann.state.phase, 'scores');
+    assert.deepEqual(ann.state.players.map((p) => p.away), [false, false, true]);
+    await env.advance(12_000);
+    assert.equal(ann.state.phase, phase);
+
+    // round 2: the others are done, the phase is about to end - Cleo's connection says hello again and again
+    ready();
+    const wait = ann.state.deadline - env.now();
+    assert.ok(wait <= 2500, `ends in ${wait} ms`);
+    for (let i = 0; i < 5; i++) {
+      await env.advance(500);
+      cleo.send({ t: 'hello', code, pid: cleo.pid, secret: cleo.secret, name: cleo.name, avatar: 'cat|1' });
+    }
+    assert.notEqual(ann.state.phase, phase, 'the countdown is not started anew by every hello');
+    assert.equal(ann.state.players[2].away, true);
+
+    // somebody the room does wait for still stops the early end by coming back (first round of a new game)
+    while (ann.state.phase !== 'final') await env.advance(1000);
+    ann.send({ t: 'again' });
+    await env.start(host);
+    cleo.drop();
+    await env.advance(10_200);
+    ready();
+    assert.ok(ann.state.deadline - env.now() <= 2500);
+    cleo.join(code);
+    assert.ok(ann.state.deadline - env.now() > 2500, 'back in time: the others wait again');
+    assert.equal(ann.state.phase, phase);
+  });
+}
