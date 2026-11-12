@@ -17,7 +17,14 @@ if [ "$config" = 1 ]; then
 fi
 echo "curl $url" >>"$STUB_LOG"
 case "$url" in
-  http://127.0.0.1:*|http://localhost:*) printf '%s' "${STUB_LOCAL_HTTP:-200}" ;;
-  https://*/api/status) printf '%s' "${STUB_PUBLIC_HTTP:-200}" ;;
+  http://127.0.0.1:*|http://localhost:*) code="${STUB_LOCAL_HTTP:-200}" uptime="${STUB_LOCAL_UPTIME:-42}" ;;
+  https://*/api/status) code="${STUB_PUBLIC_HTTP:-200}" uptime="${STUB_PUBLIC_UPTIME:-42}" ;;
   *) echo "unexpected download in a test: $url" >&2; exit 22 ;;
+esac
+case " $* " in
+  # health check: only the status code is wanted
+  *' -w '*) printf '%s' "$code" ;;
+  # body wanted, -f turns an error status into exit code 22
+  *) [ "$code" = 200 ] || exit 22
+     printf '{"ok":true,"uptime":%s}\n' "$uptime" ;;
 esac

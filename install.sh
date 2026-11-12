@@ -73,6 +73,7 @@ ORIG_ARGS=()
 # runtime
 INTERACTIVE=0
 LOG_READY=0
+LOG_SINK='/dev/null'                 # where the output of commands goes: the log once it exists
 STEP_NO=0
 STEP_TOTAL=0
 CURRENT_STEP='Preparation'
@@ -200,7 +201,7 @@ quote_cmd() {
 quiet() {
   if (( DRY_RUN )); then dry "$(quote_cmd "$@")"; return 0; fi
   log_line "\$ $(quote_cmd "$@")"
-  if (( LOG_READY )); then "$@" >>"$LOG_FILE" 2>&1; else "$@" >/dev/null 2>&1; fi
+  "$@" >>"$LOG_SINK" 2>&1
 }
 
 # long command: one tidy line on the terminal, the full output in the log,
@@ -223,7 +224,7 @@ run_logged() {
   fi
   wait "$CHILD_PID" || rc=$?
   CHILD_PID=''
-  if (( LOG_READY )); then cat "$out" >>"$LOG_FILE" 2>/dev/null || true; fi
+  cat "$out" >>"$LOG_SINK" 2>/dev/null || true
   if (( rc == 0 )); then
     ok "$label ($((SECONDS - start))s)"
   else
@@ -1153,12 +1154,20 @@ step_app() {
 # ---------------------------------------------------------------------------
 # step: process manager
 # ---------------------------------------------------------------------------
+# content of a file that may be readable for root only; a dry run never asks for root rights
+read_file() {   # <path>
+  if [[ -r "$1" ]]; then cat "$1"
+  elif (( DRY_RUN )); then return 1
+  else as_root cat "$1" 2>/dev/null
+  fi
+}
+
 # writes a file when its content changed; returns 0 when it wrote
 install_file() {   # <real path> <mode> <content>
   local path=$1 mode=$2 content=$3 target tmp writer
   target=$(dst "$path")
   writer=$(writer_for "$target")
-  if [[ -f "$target" && "$("$writer" cat "$target" 2>/dev/null)" == "$content" ]]; then return 1; fi
+  if [[ -f "$target" && "$(read_file "$target")" == "$content" ]]; then return 1; fi
   if (( DRY_RUN )); then
     dry "write $target (mode $mode):"
     printf '%s\n' "$content" | sed "s/^/      ${C_DIM}|${C_RESET} /"
@@ -1524,7 +1533,7 @@ cf_login() {
 # id of the tunnel with our name, empty when there is none
 cf_find_tunnel() {
   local json
-  json=$("$CLOUDFLARED_BIN" tunnel list --output json --name "$TUNNEL_NAME" 2>>"$LOG_FILE") || return 1
+  json=$("$CLOUDFLARED_BIN" tunnel list --output json --name "$TUNNEL_NAME" 2>>"$LOG_SINK") || return 1
   printf '%s' "$json" | "$NODE_BIN" -e '
     let text = "";
     process.stdin.on("data", (d) => (text += d)).on("end", () => {
@@ -1539,7 +1548,7 @@ cf_find_tunnel() {
 cf_tunnel() {
   local cf_home creds
   cf_home=$(dirname "$(cf_cert_path)")
-  if (( DRY_RUN )) && { [[ ! -s "$(cf_cert_path)" ]] || ! have cloudflared; }; then
+  if (( DRY_RUN )) && { [[ ! -s "$(cf_cert_path)" ]] || ! have cloudflared || ! have node; }; then
     dry "cloudflared tunnel list --output json --name $TUNNEL_NAME   (reuse the tunnel when it exists)"
     dry "cloudflared tunnel create $TUNNEL_NAME"
     TUNNEL_ID='<tunnel-id>'
@@ -1618,7 +1627,7 @@ cf_config() {
   fi
 
   content=$(render_cf_config "$creds_dst")
-  if [[ -f "$target" && "$("$writer" cat "$target" 2>/dev/null)" == "$content" ]]; then
+  if [[ -f "$target" && "$(read_file "$target")" == "$content" ]]; then
     ok "Tunnel configuration $CF_CONFIG is unchanged"
     return 1
   fi
@@ -1632,7 +1641,7 @@ cf_config() {
   if [[ "$MANAGER" == pm2 && "$conf_dir" != "$cf_home" ]]; then "$writer" chown "$SERVICE_USER:$SERVICE_GROUP" "$target" || true; fi
   ok "Tunnel configuration written: $CF_CONFIG"
   for host in "${HOSTNAMES[@]}"; do info "  $host -> http://${LOCAL_HOST/127.0.0.1/localhost}:$PORT"; done
-  if ! "$writer" "$CLOUDFLARED_BIN" tunnel --config "$target" ingress validate >>"$LOG_FILE" 2>&1; then
+  if ! "$writer" "$CLOUDFLARED_BIN" tunnel --config "$target" ingress validate >>"$LOG_SINK" 2>&1; then
     die "cloudflared does not accept the configuration $CF_CONFIG (details: $LOG_FILE)."
   fi
   return 0
@@ -1695,15 +1704,40 @@ cf_service() {   # <restart needed 0|1>
   esac
 }
 
+# Asks the public address and this server for /api/status at the same moment.
+# Only when both report the same uptime the answer really comes from this
+# instance – during a move the domain may still be served by the old server.
+# 0 = this instance answers, 2 = somebody else answers, 1 = nothing answers
+probe_public() {
+  local remote here
+  remote=$(curl -fsS --max-time 8 "https://$DOMAIN/api/status" 2>/dev/null) || return 1
+  here=$(curl -fsS --max-time 5 --noproxy '*' "http://$LOCAL_HOST:$PORT/api/status" 2>/dev/null) || return 2
+  "$NODE_BIN" -e '
+    const uptime = (text) => { try { return Number(JSON.parse(text).uptime); } catch { return NaN; } };
+    process.exit(Math.abs(uptime(process.argv[1]) - uptime(process.argv[2])) <= 15 ? 0 : 1);' "$remote" "$here" 2>/dev/null || return 2
+}
+
+# sets PUBLIC_OK: 1 = online, other = the domain is answered by another server, 0 = silent
 check_public() {   # <timeout seconds>
-  local url="https://$DOMAIN/api/status"
-  if (( DRY_RUN )); then dry "wait until $url answers with 200 (max. $1s)"; return 0; fi
-  if wait_for_http "$url" "$1" "Waiting for $url"; then
-    PUBLIC_OK=1
-    ok "$url answers – the instance is online"
-  else
-    PUBLIC_OK=0
-  fi
+  local timeout=$1 url="https://$DOMAIN/api/status" start=$SECONDS rc other=0
+  if (( DRY_RUN )); then dry "wait until $url is answered by this instance (max. ${timeout}s)"; return 0; fi
+  while true; do
+    rc=0
+    probe_public || rc=$?
+    if (( rc == 0 )); then
+      [[ -t 1 ]] && printf '\r\e[K'
+      PUBLIC_OK=1
+      ok "$url is answered by this instance – LaughTime is online"
+      return 0
+    fi
+    (( rc != 2 )) || other=1
+    (( SECONDS - start < timeout )) || break
+    [[ -t 1 ]] && printf '\r  %s…%s Waiting for %s (%ds of max. %ds) ' "$C_CYAN" "$C_RESET" "$url" "$((SECONDS - start))" "$timeout"
+    sleep 3
+  done
+  [[ -t 1 ]] && printf '\r\e[K'
+  if (( other )); then PUBLIC_OK='other'; else PUBLIC_OK=0; fi
+  log_line "  $url: no answer from this instance within ${timeout}s (result: $PUBLIC_OK)"
 }
 
 step_tunnel() {
@@ -1729,7 +1763,9 @@ step_tunnel() {
   fi
   check_public "$PUBLIC_TIMEOUT"
   if [[ "$PUBLIC_OK" == 0 ]]; then
-    warn "https://$DOMAIN/api/status did not answer with 200 within ${PUBLIC_TIMEOUT} seconds. New DNS records can take a few minutes; test again with: curl -I https://$DOMAIN/api/status"
+    warn "https://$DOMAIN/api/status did not answer within ${PUBLIC_TIMEOUT} seconds. New DNS records can take a few minutes; test again with: curl -I https://$DOMAIN/api/status"
+  elif [[ "$PUBLIC_OK" == other ]]; then
+    warn "https://$DOMAIN answers, but not from this server yet – another server or an old DNS record still serves the domain. Give it a few minutes, then run the script again or compare: curl https://$DOMAIN/api/status"
   fi
 }
 
@@ -1743,7 +1779,7 @@ announce() {
   [[ -n "$hook" ]] || return 0
   if [[ "$PUBLIC_OK" != 1 ]]; then
     (( DRY_RUN )) && { dry "post \"LaughTime v2 is live on $DOMAIN\" to the Discord webhook (only when the public URL answers)"; return 0; }
-    info "Discord: no announcement, because https://$DOMAIN did not answer yet. Run the script again when it does."
+    info "Discord: no announcement, because https://$DOMAIN is not served by this instance yet. Run the script again when it is."
     return 0
   fi
   if [[ "$(state_get announced)" == "$DOMAIN" ]]; then
@@ -1758,12 +1794,12 @@ announce() {
   title="LaughTime v2 is live on $DOMAIN"
   text="LaughTime v2 ist jetzt live: https://$DOMAIN – LaughTime v2 is now live: https://$DOMAIN"
   if [[ -f "$APP_DIR/scripts/announce.mjs" ]]; then
-    (cd "$APP_DIR" && as_app "$NODE_BIN" scripts/announce.mjs "$title" "$text") >>"$LOG_FILE" 2>&1 || rc=$?
+    (cd "$APP_DIR" && as_app "$NODE_BIN" scripts/announce.mjs "$title" "$text") >>"$LOG_SINK" 2>&1 || rc=$?
   elif [[ "$hook" =~ ^https://[^[:space:]\"\\]+$ ]]; then
     # shellcheck disable=SC2016  # JavaScript template string, not a shell expansion
     payload=$("$NODE_BIN" -e 'process.stdout.write(JSON.stringify({ content: `**${process.argv[1]}**\n${process.argv[2]}` }))' "$title" "$text")
     # the webhook address is a secret: it goes to curl on stdin, not on the command line
-    printf 'url = "%s"\n' "$hook" | curl -fsS --max-time 15 -o /dev/null -H 'Content-Type: application/json' -d "$payload" -K - >>"$LOG_FILE" 2>&1 || rc=$?
+    printf 'url = "%s"\n' "$hook" | curl -fsS --max-time 15 -o /dev/null -H 'Content-Type: application/json' -d "$payload" -K - >>"$LOG_SINK" 2>&1 || rc=$?
   else
     rc=1
   fi
@@ -1783,7 +1819,7 @@ step_summary() {
   step 'Summary'
   if [[ -z "$PUBLIC_OK" ]] && (( ! DRY_RUN )) && [[ "$MANAGER" != none ]]; then
     # no tunnel from this run: one short look whether a reverse proxy already answers
-    if wait_for_http "https://$DOMAIN/api/status" 0 ''; then PUBLIC_OK=1; else PUBLIC_OK=0; fi
+    check_public 0
   fi
   announce || true
 
@@ -1810,7 +1846,8 @@ step_summary() {
     box_line 'Tunnel      none (--no-tunnel) – reverse proxy example: deploy/nginx.example.conf'
   fi
   case "$PUBLIC_OK" in
-    1) box_line "Public      ${C_GREEN}https://$DOMAIN answers${C_RESET}" ;;
+    1) box_line "Public      ${C_GREEN}https://$DOMAIN is online (answered by this instance)${C_RESET}" ;;
+    other) box_line "Public      ${C_YELLOW}https://$DOMAIN answers, but from another server${C_RESET} (old DNS record?)" ;;
     0)
       if (( WANT_TUNNEL )); then
         box_line "Public      ${C_YELLOW}https://$DOMAIN does not answer yet${C_RESET} (DNS can take a few minutes)"
@@ -1933,6 +1970,7 @@ start_log() {
   if [[ ! -d "$DATA_DIR" ]] && mkdir -p "$DATA_DIR" 2>/dev/null; then DATA_CREATED=1; own "$DATA_DIR"; fi
   if : >>"$LOG_FILE" 2>/dev/null; then
     LOG_READY=1
+    LOG_SINK=$LOG_FILE
     own "$LOG_FILE"
     log_line ''
     log_line "######## install.sh ${ORIG_ARGS[*]:-} – $(date '+%Y-%m-%d %H:%M:%S %z') ########"

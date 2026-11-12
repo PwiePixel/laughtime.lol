@@ -121,7 +121,7 @@ test('systemd and tunnel: units, configuration and the order of the calls', { sk
 
   // the authorisation link cannot be missed
   assert.match(res.out, /OPEN THIS LINK IN YOUR BROWSER[\s\S]*https:\/\/dash\.cloudflare\.com\/argotunnel\?aud=[\s\S]*Choose the zone {2}example\.test/);
-  assert.match(res.out, /https:\/\/example\.test answers/);
+  assert.match(res.out, /https:\/\/example\.test\/api\/status is answered by this instance/);
   assert.match(res.out, /LaughTime is installed/);
 
   // second run: nothing is done twice, nobody is thrown out of a game
@@ -134,6 +134,18 @@ test('systemd and tunnel: units, configuration and the order of the calls', { sk
     assert.equal(second.some((c) => c.includes(text)), false, `second run called "${text}"\n${second.join('\n')}`);
   }
   assert.equal(sha256(path.join(box.project, '.env')), envHash);
+  assert.deepEqual(fs.readdirSync(box.rootFile('etc/cloudflared')).sort(), [`${TUNNEL_ID}.json`, 'config.yml', 'laughtime.yml']);
+
+  // a dry run on the installed system: prints the new configuration, touches nothing
+  const snapshot = () => [box.rootFile('etc/systemd/system/laughtime.service'), box.rootFile('etc/cloudflared/laughtime.yml'),
+    path.join(box.project, 'data', 'install.log'), path.join(box.project, 'data', 'install.state')].map(sha256);
+  const frozen = snapshot();
+  box.clearCalls();
+  const dry = box.run([...FULL(box), '--no-www', '--dry-run']);
+  assert.equal(dry.code, 0, dry.out);
+  assert.match(dry.out, /\[dry-run\] write .*laughtime\.yml/);
+  assert.deepEqual(snapshot(), frozen);
+  assert.deepEqual(box.calls().filter((c) => !/^(cloudflared (--version|tunnel list)|pm2 --version|npm prefix)/.test(c)), []);
   assert.deepEqual(fs.readdirSync(box.rootFile('etc/cloudflared')).sort(), [`${TUNNEL_ID}.json`, 'config.yml', 'laughtime.yml']);
 
   // changed hostnames: our previous configuration is kept as a backup, the tunnel restarts, the app does not
@@ -192,6 +204,15 @@ test('DNS problems and a silent public URL are reported, not hidden', { skip }, 
   assert.match(res.out, /https:\/\/example\.test does not answer yet/);
   // nobody is told "we are live" while the address does not answer
   assert.equal(box.calls().some((c) => c.startsWith('curl webhook')), false);
+
+  // the domain answers, but it is still the old server: not "online", no announcement
+  const moving = sandbox(t);
+  fs.writeFileSync(path.join(moving.project, '.env'), `PORT=3000\nPUBLIC_URL=https://example.test\nDISCORD_WEBHOOK_URL=${WEBHOOK}\n`);
+  const old = moving.run(FULL(moving), { STUB_PUBLIC_UPTIME: '864000' });
+  assert.equal(old.code, 0, old.out);
+  assert.match(old.out, /answers, but not from this server yet/);
+  assert.equal(/is answered by this instance/.test(old.out), false);
+  assert.equal(moving.calls().some((c) => c.startsWith('curl webhook')), false);
 });
 
 test('the login gives up with a helpful message', { skip }, (t) => {
