@@ -1443,6 +1443,11 @@ function handleHello(ws, msg) {
   }
   if (room.phase === 'caption' && room.current?.subs.has(pid) && !room.current.subs.get(pid).submitted) cancelEarlyEnd(room);
   if (room.phase === 'upload' && !room.current?.contribs.has(pid)) cancelEarlyUploadEnd(room);
+  if (paced(room)) {
+    // with this player back the others may be far enough for a last call
+    maybeEndCaptionEarly(room);
+    maybeEndUploadEarly(room);
+  }
   send(ws, { t: 'welcome', pid, code: room.code });
   broadcast(room);
   checkPublicStart(room);

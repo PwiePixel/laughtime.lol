@@ -108,6 +108,29 @@ test('pacing: the shortened clock survives an early end that is cancelled by a r
   assert.ok(dora.state.caption.hunt);
 });
 
+test('pacing: a player who returns into an early end gets the last call, not the full clock', async () => {
+  const { code, players, host } = await env.room(3, { game: 'hunt' });
+  const [ann, ben, cleo] = players;
+  await env.start(host);
+  const began = env.now();
+  await env.advance(1000);
+  cleo.drop();
+  await env.advance(11_000);
+  // two players are here and both are done: no last call with two, the round ends in 1.5 s
+  for (const p of [ann, ben]) await ready(p);
+  assert.equal(host.state.lastCall, false);
+  assert.equal(left(host), 1500);
+  // Cleo is back in time: the early end is off, but two of three are done
+  await env.advance(1000);
+  cleo.join(code);
+  assert.equal(cleo.state.phase, 'caption');
+  assert.equal(cleo.state.caption.submitted, false);
+  assert.equal(cleo.state.lastCall, true);
+  assert.equal(cleo.state.deadline, began + 45_000);
+  await ready(cleo);
+  assert.equal(left(host), 1500);
+});
+
 test('pacing: a silent round makes a player away - the others are no longer held up', async () => {
   const { players, host } = await env.room(4, { game: 'hunt', settings: { rounds: 3 } });
   const [ann, ben, cleo, dora] = players;
