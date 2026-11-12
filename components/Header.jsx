@@ -102,8 +102,7 @@ export default function Header({ activityView = null }) {
   const { lang, setLang, t, activityMode } = useApp();
   const pathname = usePathname();
   const inActivity = activityView !== null;
-  // the layout's header steps aside for the activity's own one –
-  // and GeoTime (own game, own ports) brings its own look entirely
+  // the layout's header steps aside for the activity's own one
   if (!inActivity && (activityMode || pathname?.startsWith('/activity'))) return null;
   const links = [
     { href: '/', label: t('nav.play'), icon: 'play', view: 'game' },

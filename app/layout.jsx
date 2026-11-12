@@ -1,4 +1,4 @@
-import { cookies, headers } from 'next/headers';
+import { cookies } from 'next/headers';
 import Footer from '@/components/Footer';
 import Header from '@/components/Header';
 import Providers from '@/components/Providers';
@@ -49,22 +49,6 @@ export const viewport = {
 export default async function RootLayout({ children }) {
   const store = await cookies();
   const lang = normalizeLang(store.get(LANG_COOKIE)?.value);
-
-  // GeoTime.lol liegt im selben Build, ist aber eine eigene Seite unter einer
-  // eigenen Domain: dort gehören Kopfzeile, Fußzeile und die Konten-Logik von
-  // LaughTime nicht hin. Das Kennzeichen setzt der GeoTime-Port (geotime/
-  // instances.js); bei jeder normalen LaughTime-Anfrage fehlt es und unten
-  // läuft alles unverändert weiter.
-  const requestHeaders = await headers();
-  if (requestHeaders.get('x-geotime-instance')) {
-    // GeoTime hat ein eigenes Sprach-Cookie (gt_lang), Standard ist Englisch
-    const geoLang = store.get('gt_lang')?.value === 'de' ? 'de' : 'en';
-    return (
-      <html lang={geoLang} className={`${uiFont.variable} ${memeFont.variable}`}>
-        <body>{children}</body>
-      </html>
-    );
-  }
 
   return (
     <html lang={lang} className={`${uiFont.variable} ${memeFont.variable}`}>

@@ -107,7 +107,7 @@ function run(cmd, cmdArgs, extraEnv = {}) {
 
 function hashSources() {
   const h = crypto.createHash('sha1');
-  const include = ['app', 'components', 'lib', 'public', 'proxy.js', 'next.config.mjs', 'jsconfig.json', 'package.json'];
+  const include = ['app', 'components', 'lib', 'public', 'next.config.mjs', 'jsconfig.json', 'package.json'];
   const walk = (p) => {
     if (!fs.existsSync(p)) return;
     const st = fs.statSync(p);
@@ -122,13 +122,11 @@ function hashSources() {
   include.forEach((p) => walk(path.join(ROOT, p)));
   // public env vars are baked into the client bundle
   h.update(Object.keys(process.env).filter((k) => k.startsWith('NEXT_PUBLIC_')).sort().map((k) => `${k}=${process.env[k]}`).join('\n'));
-  // GeoTime bakes its own domain into the pages -> a new domain needs a new build
-  for (const k of ['GEOTIME_PUBLIC_URL', 'GEOTIME_NOINDEX']) h.update(`${k}=${process.env[k] || ''}`);
   return h.digest('hex');
 }
 
 // 4) dependencies -----------------------------------------------------------
-// alles aus package.json prüfen – so wird kein neues Paket vergessen
+// check every package from package.json, so a new one is never missed
 const declared = (() => {
   try {
     return Object.keys(JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).dependencies || {});
@@ -162,15 +160,3 @@ if (!DEV) {
 process.env.NODE_ENV = DEV ? 'development' : 'production';
 const { startServer } = await import(pathToFileURL(path.join(ROOT, 'server', 'server.js')).href);
 await startServer({ dev: DEV, dir: ROOT });
-
-// 7) GeoTime.lol ------------------------------------------------------------
-// Zweites Spiel der Spielwelt: eigener Port (PORT_GEOTIME), eigene Datenbank
-// (data/geotime.db), eigene Discord-App. Es läuft im selben Prozess und ist von
-// LaughTime getrennt – ohne PORT_GEOTIME passiert hier gar nichts.
-try {
-  const { startGeotime } = await import(pathToFileURL(path.join(ROOT, 'geotime', 'boot.js')).href);
-  await startGeotime({ appPort: Number(process.env.SERVER_PORT || process.env.PORT || 3000) });
-} catch (err) {
-  // GeoTime darf LaughTime niemals mitreißen
-  console.warn('\x1b[36m[geotime]\x1b[0m start failed:', err.message);
-}
