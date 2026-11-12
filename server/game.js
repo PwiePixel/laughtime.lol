@@ -1629,7 +1629,10 @@ function handleReport(ws, room, player, msg) {
     context = memeContext(entry);
   } else if (msg.target === 'result') {
     const round = Number(msg.round) || room.round;
-    const list = round === room.round && cur?.results?.length ? cur.results : room.history.find((h) => h.round === round)?.entries || [];
+    // The results of the running round are public from the scores on. While the vote runs, an
+    // answer for "the meme of player X" would tell who made the memes that were already shown.
+    const shown = room.phase === 'scores' || room.phase === 'final';
+    const list = round === room.round && shown && cur?.results?.length ? cur.results : room.history.find((h) => h.round === round)?.entries || [];
     const entry = list.find((e) => e.pid === String(msg.pid));
     if (!entry) return;
     target = responsible(entry);
