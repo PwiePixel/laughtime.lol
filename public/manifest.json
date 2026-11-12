@@ -55,9 +55,9 @@
   ],
   "screenshots": [
     { "src": "/screenshots/home-narrow.png", "sizes": "780x1688", "type": "image/png", "form_factor": "narrow", "label": "Start a game in seconds" },
+    { "src": "/screenshots/lobby-narrow.png", "sizes": "780x1688", "type": "image/png", "form_factor": "narrow", "label": "Invite your friends with a code" },
     { "src": "/screenshots/caption-narrow.png", "sizes": "780x1688", "type": "image/png", "form_factor": "narrow", "label": "Write the funniest caption" },
-    { "src": "/screenshots/memes-narrow.png", "sizes": "780x1688", "type": "image/png", "form_factor": "narrow", "label": "The best memes of the community" },
     { "src": "/screenshots/home-wide.png", "sizes": "1280x800", "type": "image/png", "form_factor": "wide", "label": "LaughTime on the big screen" },
-    { "src": "/screenshots/lobby-wide.png", "sizes": "1280x800", "type": "image/png", "form_factor": "wide", "label": "Invite your friends with a code" }
+    { "src": "/screenshots/caption-wide.png", "sizes": "1280x800", "type": "image/png", "form_factor": "wide", "label": "Caption memes and short clips" }
   ]
 }

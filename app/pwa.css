@@ -470,7 +470,9 @@ html[data-pwa-game] body {
   }
 
   .tabs button,
-  .icon-btn {
+  .icon-btn,
+  .account-dropdown a,
+  .account-dropdown button {
     min-height: 44px;
   }
 
@@ -493,10 +495,12 @@ html[data-pwa-game] body {
   .swatch::after,
   .meme-download::after,
   .sound-toggle::after,
+  .media-add::after,
+  .media-remove::after,
   .streamer-toggle.is-compact::after {
     content: '';
     position: absolute;
-    inset: -8px;
+    inset: -6px;
     border-radius: inherit;
   }
 }
