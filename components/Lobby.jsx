@@ -480,7 +480,7 @@ function PrivateLobby({ game }) {
       </div>
       </div>
       {isHost && (
-        <ActionBar info={t('lobby.playersShort', { n: connected.length })}>
+        <ActionBar info={connected.length === 1 ? t('lobby.playersShort.one') : t('lobby.playersShort', { n: connected.length })}>
           <button type="button" className="btn btn-yellow btn-block" disabled={!enough || starting} onClick={() => send({ t: 'start' })}>
             {starting ? (
               t('lobby.starting')

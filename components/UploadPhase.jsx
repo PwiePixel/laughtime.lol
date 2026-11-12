@@ -77,7 +77,7 @@ function SearchPick({ up, search, onSearch, onPick, picking, autoFocus }) {
             ))}
           </>
         )}
-        {left > 0 && <span className="idea-left small">{t('swap.searchesLeft', { n: left })}</span>}
+        {left > 0 && <span className="idea-left small">{left === 1 ? t('swap.searchesLeft.one') : t('swap.searchesLeft', { n: left })}</span>}
       </div>
       {busy && (
         <div className="media-grid swap-results is-loading" role="status">
