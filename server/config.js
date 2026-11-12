@@ -66,6 +66,23 @@ export function getConfig() {
 
     // "GIF Hunt" mode: searches per player per round
     huntSearches: Math.max(1, Math.min(10, num(e.HUNT_SEARCHES, 2))),
+
+    // API protection: hard upper limit of requests per hour and host (0 = no limit).
+    // The defaults stay below what free GIPHY / KLIPY keys allow (100 per hour).
+    giphyHourlyLimit: Math.max(0, num(e.GIPHY_HOURLY_LIMIT, 90)),
+    klipyHourlyLimit: Math.max(0, num(e.KLIPY_HOURLY_LIMIT, 90)),
+    imgflipHourlyLimit: Math.max(0, num(e.IMGFLIP_HOURLY_LIMIT, 600)),
+    // how long search results are kept, and how many different searches
+    searchCacheMs: Math.max(1, Math.min(24 * 60, num(e.SEARCH_CACHE_MINUTES, 15))) * 60 * 1000,
+    searchCacheMax: Math.max(50, Math.min(5000, num(e.SEARCH_CACHE_ENTRIES, 500))),
+
+    // image pipeline of the media proxy (/api/media?u=…&w=…)
+    imageVariants: bool(e.IMAGE_VARIANTS, true),
+    imageAvif: bool(e.IMAGE_AVIF, true),
+    imageWorkers: Math.max(1, Math.min(8, num(e.IMAGE_WORKERS, 2))),
+
+    // compress WebSocket messages (permessage-deflate) – see server.js for the reasoning
+    wsCompression: bool(e.WS_COMPRESSION, false),
   };
   return cached;
 }
