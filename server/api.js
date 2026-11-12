@@ -27,6 +27,7 @@ import {
 import { getConfig } from './config.js';
 import { isAdmin as isAdminUser } from './accounts.js';
 import { handleActivityApi, isActivityRequest } from './activity.js';
+import { handleBetaApi, loginHandover, loginReturn, redeemLoginHandover } from './beta.js';
 import { exchangeCode, fetchUser } from './discord.js';
 import { HttpError, checkOrigin, clientIp, createLimiter, isHttps, json, parseCookies, readJson, redirect, serializeCookie } from './http.js';
 import { apiCache } from './lib/respond.js';
@@ -95,7 +96,8 @@ async function discordLoginStart(req, res, ctx) {
   if (!d.enabled) throw new HttpError(404, 'discord_disabled');
   const state = crypto.randomBytes(18).toString('base64url');
   const link = new URL(req.url, 'http://x').searchParams.get('link') === '1' && ctx.user ? ctx.user.id : null;
-  oauthStates.set(state, { expires: Date.now() + 10 * 60_000, linkUserId: link });
+  // started on the beta host: the callback hands the login back to it (see beta.js)
+  oauthStates.set(state, { expires: Date.now() + 10 * 60_000, linkUserId: link, back: loginReturn(req, d.redirectUri) });
   for (const [k, v] of oauthStates) if (v.expires < Date.now()) oauthStates.delete(k);
   const url = new URL(d.authorizeUrl);
   url.searchParams.set('client_id', d.clientId);
@@ -111,15 +113,18 @@ async function discordLoginStart(req, res, ctx) {
 
 async function discordCallback(req, res, ctx) {
   const d = discordConfig();
+  let home = ''; // origin of the beta host when the login was started there
   const fail = (code) =>
-    redirect(res, `/login?error=${code}`, { 'Set-Cookie': serializeCookie(OAUTH_COOKIE, '', { maxAge: 0, secure: ctx.secure }) });
+    redirect(res, `${home}/login?error=${code}`, { 'Set-Cookie': serializeCookie(OAUTH_COOKIE, '', { maxAge: 0, secure: ctx.secure }) });
   if (!d.enabled) return fail('discord_disabled');
   const params = new URL(req.url, 'http://x').searchParams;
   const state = params.get('state') || '';
   const cookieState = parseCookies(req.headers.cookie)[OAUTH_COOKIE] || '';
   const saved = oauthStates.get(state);
   oauthStates.delete(state);
-  if (!state || state !== cookieState || !saved || saved.expires < Date.now()) return fail('discord_state');
+  if (saved?.back) home = saved.back.origin;
+  // a login from the beta host has its state cookie over there: it is checked at the hand-over instead
+  if (!state || (state !== cookieState && !saved?.back) || !saved || saved.expires < Date.now()) return fail('discord_state');
   if (params.get('error') || !params.get('code')) return fail('discord_cancelled');
 
   let profile;
@@ -135,11 +140,18 @@ async function discordCallback(req, res, ctx) {
   const discordId = String(profile.id);
   const discordName = sanitizeName(profile.global_name || profile.username || 'Discord') || 'Discord';
 
+  const identity = { discordId, discordName, username: profile.username, linkUserId: saved.linkUserId };
+  if (saved.back) return loginHandover(res, saved.back, state, identity);
+  return finishDiscordLogin(res, ctx, identity);
+}
+
+/** Last step of the Discord login: connect, sign up or log in – on the host the login was started on. */
+function finishDiscordLogin(res, ctx, { discordId, discordName, username, linkUserId }) {
   let user = getUserByDiscord(discordId);
-  if (saved.linkUserId) {
+  if (linkUserId) {
     // connect Discord to the account that started the flow
-    if (user && user.id !== saved.linkUserId) return redirect(res, '/account?error=discord_in_use');
-    updateUser(saved.linkUserId, { discord_id: discordId, discord_name: discordName });
+    if (user && user.id !== linkUserId) return redirect(res, '/account?error=discord_in_use');
+    updateUser(linkUserId, { discord_id: discordId, discord_name: discordName });
     return redirect(res, '/account?linked=discord', {
       'Set-Cookie': serializeCookie(OAUTH_COOKIE, '', { maxAge: 0, secure: ctx.secure }),
     });
@@ -147,7 +159,7 @@ async function discordCallback(req, res, ctx) {
   let isNew = false;
   if (!user) {
     user = createUser({
-      username: suggestUsername(profile.username),
+      username: suggestUsername(username),
       displayName: discordName,
       discordId,
       discordName,
@@ -497,6 +509,16 @@ export async function handleApi(req, res, url) {
     }
     if (p === '/api/auth/discord' && method === 'GET') return (await discordLoginStart(req, res, ctx), true);
     if (p === '/api/auth/discord/callback' && method === 'GET') return (await discordCallback(req, res, ctx), true);
+    if (p === '/api/auth/handover' && method === 'GET') {
+      // second half of a Discord login that was started on the beta host
+      const identity = redeemLoginHandover(req, q.get('code'), parseCookies(req.headers.cookie)[OAUTH_COOKIE]);
+      if (identity) return (finishDiscordLogin(res, ctx, identity), true);
+      redirect(res, '/login?error=discord_state', { 'Set-Cookie': serializeCookie(OAUTH_COOKIE, '', { maxAge: 0, secure: ctx.secure }) });
+      return true;
+    }
+
+    // --- beta channel (beta.js) ---
+    if (p.startsWith('/api/beta') && (await handleBetaApi(req, res, ctx, p, method))) return true;
 
     // --- public data ---
     if (p === '/api/leaderboard' && method === 'GET') {

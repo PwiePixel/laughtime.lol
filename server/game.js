@@ -1425,3 +1425,14 @@ export function attachGame(wss) {
   heartbeat.unref?.();
   wss.on('close', () => clearInterval(heartbeat));
 }
+
+/** open rooms and connected players per release channel (read-only, for the admin dashboard) */
+export function channelStats() {
+  const out = { stable: { rooms: 0, players: 0 }, beta: { rooms: 0, players: 0 } };
+  for (const r of rooms.values()) {
+    const entry = out[r.channel === 'beta' ? 'beta' : 'stable'];
+    entry.rooms++;
+    for (const p of r.players.values()) if (p.connected) entry.players++;
+  }
+  return out;
+}
