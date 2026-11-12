@@ -343,7 +343,7 @@ export default function UploadPhase({ game }) {
       <ActionBar timer={<Timer deadline={state.deadline} serverNow={serverNow} compact urgent={state.lastCall} />} info={`${done}/${total}`}>
         {up.endingSoon ? (
           <button type="button" className="btn btn-white btn-block" disabled>
-            <span className="spinner tiny" aria-hidden="true" /> {t('swap.allDone')}
+            <span className="spinner tiny" aria-hidden="true" /> {t('caption.allDone')}
           </button>
         ) : showChosen ? (
           <button type="button" className="btn btn-white btn-block" onClick={() => setChoosing(true)}>

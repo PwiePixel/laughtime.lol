@@ -93,6 +93,9 @@ function Fatal({ code: errCode, info }) {
   );
 }
 
+// shown in place by the phase itself (GIF Hunt: "nothing found" under the search box)
+const INLINE_NOTICES = new Set(['search_empty']);
+
 function Toast({ notice, minPlayers }) {
   const { t } = useApp();
   const [visible, setVisible] = useState(false);
@@ -102,7 +105,7 @@ function Toast({ notice, minPlayers }) {
     const id = setTimeout(() => setVisible(false), 3500);
     return () => clearTimeout(id);
   }, [notice]);
-  if (!notice || !visible) return null;
+  if (!notice || !visible || INLINE_NOTICES.has(notice.code)) return null;
   const key = `err.${notice.code}`;
   const text = t(key, { n: minPlayers });
   return (

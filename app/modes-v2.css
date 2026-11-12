@@ -1589,6 +1589,11 @@ button.strip-player {
     padding-bottom: calc(66px + var(--saib, env(safe-area-inset-bottom, 0px)));
   }
 
+  /* keyboard open: enough page below the text box to lift it above keyboard and bar */
+  html.has-action-bar.kb-open body {
+    padding-bottom: calc(66px + var(--kb, 0px));
+  }
+
   html.has-action-bar .toast {
     bottom: calc(78px + var(--kb, 0px) + var(--saib, env(safe-area-inset-bottom, 0px)));
   }
@@ -1628,9 +1633,6 @@ button.strip-player {
     display: grid;
   }
 
-  .caption-input textarea {
-    scroll-margin: 230px 0 100px;
-  }
 
   /* keyboard open: the meme shrinks and stays on screen above the text box */
   html.kb-open .caption-phase {
@@ -1639,8 +1641,12 @@ button.strip-player {
 
   html.kb-open .caption-phase .editor-stage {
     position: sticky;
-    top: 4px;
+    top: 0;
     z-index: 6;
+    /* a full-width backdrop, so the page does not shine through next to a narrow meme */
+    margin: 0 -16px;
+    padding: 4px 16px 6px;
+    background: var(--glass-bg-strong);
   }
 
   .hunt-start {
@@ -1674,14 +1680,48 @@ button.strip-player {
     aspect-ratio: 2 / 1;
   }
 
+  /* swap and GIF Hunt: room for the options / the tray above the text box */
+  .caption-phase.game-swap {
+    --stage-h: min(32vh, 250px);
+  }
+
+  .caption-phase.game-hunt {
+    --stage-h: min(34vh, 280px);
+  }
+
+  .hand-duo {
+    padding-bottom: 10px;
+  }
+
+  .hand-duo-row {
+    gap: 12px;
+    padding: 4px 6px;
+  }
+
   /* bring */
   .upload-phase {
     --stage-h: min(32vh, 280px);
   }
 
+  /* three tabs always fit one row: icon above a short label */
+  .swap-tabs {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
   .swap-tabs button {
-    padding: 7px 8px;
-    font-size: 0.92rem;
+    flex-direction: column;
+    gap: 2px;
+    padding: 6px 2px;
+    font-size: 0.8rem;
+    line-height: 1.15;
+  }
+
+  .swap-tabs button span {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .swap-search .hunt-form {
@@ -1773,6 +1813,19 @@ button.strip-player {
 
   .scores-phase .scores-layout {
     gap: 12px;
+  }
+
+  /* order on phones: memes, leaderboard, then what was left on the shelf */
+  .scores-phase .results-col {
+    display: contents;
+  }
+
+  .scores-phase .leaderboard {
+    order: 2;
+  }
+
+  .scores-phase .leftover {
+    order: 3;
   }
 
   .scores-phase .result-grid {

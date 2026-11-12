@@ -119,6 +119,10 @@ export default function VotePhase({ game }) {
             <p className={`query-chip ${hunt ? 'stamp-in' : ''}`}>
               <Icon name="search" size={15} /> {t('vote.searchedFor', { q: v.meme.query })}
             </p>
+          ) : hunt && reveal ? (
+            <p className="query-chip stamp-in">
+              <Icon name="dice" size={15} /> {t('hunt.luckyTile')}
+            </p>
           ) : (
             hunt && (
               <p className="query-chip is-secret" aria-hidden="true">
