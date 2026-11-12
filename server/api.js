@@ -572,13 +572,15 @@ export async function handleApi(req, res, url) {
     if (p.startsWith('/api/packs') && (await packRoutes(req, res, ctx, p, method, q))) return true;
     if (p === '/api/community' && method === 'GET') {
       // shown on the start page: the parts that are the same for everybody are computed at most every 15 s
-      const shared = apiCache.value('community', 15_000, () => ({
-        stats: siteStats(),
-        topPlayers: leaderboard('points', 'week', 5),
-        topMemes: listMemes({ sort: 'top', period: 'week', viewer: null, limit: 4 }).items,
-      }));
+      const shared = () =>
+        apiCache.value('community', 15_000, () => ({
+          stats: siteStats(),
+          topPlayers: leaderboard('points', 'week', 5),
+          topMemes: listMemes({ sort: 'top', period: 'week', viewer: null, limit: 4 }).items,
+        }));
       // with an account the memes carry "liked by me": always fresh, never from the cache
-      json(res, 200, ctx.user ? { ...shared, topMemes: listMemes({ sort: 'top', period: 'week', viewer: ctx.user, limit: 4 }).items } : shared);
+      if (ctx.user) json(res, 200, { ...shared(), topMemes: listMemes({ sort: 'top', period: 'week', viewer: ctx.user, limit: 4 }).items });
+      else apiCache.send(req, res, 'community:guest', 15_000, shared, { cacheControl: 'private, no-cache' });
       return true;
     }
     return false;
