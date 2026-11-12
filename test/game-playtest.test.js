@@ -129,3 +129,52 @@ test('a client that keeps saying hello under new ids cannot grow a room without 
   assert.deepEqual(ben.errors(), []);
   assert.ok(ben.me().score > 0);
 });
+
+test('swap: a report about a picture reaches whoever brought it, also after they left', async () => {
+  env.search();
+  const { players, host } = await env.room(3, { game: 'swap', settings: { rounds: 1 } });
+  const [ann, ben, cleo] = players;
+  await env.start(host);
+  const brought = new Map();
+  for (const [i, p] of players.entries()) {
+    await env.advance(700);
+    p.send({ t: 'swap_search', q: 'cats' });
+    await flush();
+    const [res] = p.take('swap_results').slice(-1);
+    p.send({ t: 'swap_pick', id: res.items[i].id });
+    brought.set(p, res.items[i].id);
+  }
+  await env.advance(2500);
+  assert.equal(ann.state.phase, 'caption');
+  // Ann takes Cleo's picture, then Cleo leaves the room
+  ann.send({ t: 'pick', id: ann.state.caption.hand.find((tile) => tile.media.id === brought.get(cleo)).id });
+  assert.equal(ann.state.caption.media.id, brought.get(cleo));
+  cleo.send({ t: 'leave' });
+  ann.send({ t: 'submit', captions: caption('made with the picture of somebody who left') });
+  ben.send({ t: 'submit', captions: caption('ben') });
+  await env.advance(1500);
+  assert.equal(ann.state.phase, 'vote');
+  if (!ann.state.vote.isMine) {
+    ann.send({ t: 'vote', score: 3 });
+    await env.advance(900 + 3500);
+  }
+  assert.equal(ann.state.vote.isMine, true);
+  // Ben finds the picture offensive: that is not Ann's doing
+  assert.equal(await report(ben, { target: 'vote', reason: 'upload' }), 1);
+  assert.equal(await report(ben, { target: 'vote', reason: 'meme' }), 1);
+  const rows = env.db.all('SELECT target_pid, target_name, reason FROM reports WHERE reporter_pid = ? ORDER BY id', ben.pid);
+  assert.deepEqual(rows.map((r) => ({ ...r })), [
+    { target_pid: cleo.pid, target_name: cleo.name, reason: 'upload' },
+    { target_pid: ann.pid, target_name: ann.name, reason: 'meme' },
+  ]);
+  // no picture bonus for somebody who is gone, and nothing in the answers names anybody
+  ben.send({ t: 'vote', score: 5 });
+  await env.advance(900 + 3500);
+  while (ann.state.phase === 'vote') {
+    await rate([ann, ben], 5);
+    await env.advance(3500);
+  }
+  assert.equal(ann.state.phase, 'scores');
+  assert.equal(ann.state.results.find((r) => r.pid === ann.pid).assist, null);
+  assert.deepEqual(ben.errors(), []);
+});

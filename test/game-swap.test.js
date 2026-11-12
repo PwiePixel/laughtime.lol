@@ -489,7 +489,7 @@ test('swap: reporting the picture targets whoever brought it, reporting the meme
   // the answer tells the reporter nothing about who it was
   assert.deepEqual(reporter.errors(), []);
 
-  // from the scores: same rule; when the bringer has left, the author is responsible
+  // from the scores: same rule
   await voteRound(players, () => 3);
   assert.equal(host.state.phase, 'scores');
   const entry = host.state.results.find((r) => r.pid !== players[0].pid && r.from !== players[0].pid && r.from !== r.pid) || null;

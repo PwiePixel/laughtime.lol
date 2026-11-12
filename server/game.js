@@ -146,6 +146,7 @@ export function createRoom({ game = 'classic', isPublic = false, activity = null
     history: [], // finished rounds: [{ round, entries: [{pid, meme, points, avg}] }]
     tally: new Map(),
     crowd: new Map(), // pid -> reactions received while their meme was on screen (award at the final)
+    bringers: new Map(), // pid -> who brought a picture in this game (a report still reaches them after they left)
     final: null, // ranking and awards, computed once when the game ends
     // Discord Activity: { instanceId, guildId, channelId, allowed: Set<userId> }
     activity,
@@ -821,6 +822,7 @@ async function startGame(room) {
   room.history = [];
   room.tally = new Map();
   room.crowd = new Map();
+  room.bringers = new Map();
   room.final = null;
   dropRoomFiles(room);
   startRound(room);
@@ -918,6 +920,7 @@ function dropContribution(room, pid) {
 function setContribution(room, player, media, { source, rel = null }) {
   dropContribution(room, player.id);
   room.current.contribs.set(player.id, { media, from: player.id, source, rel });
+  room.bringers.set(player.id, { id: player.id, userId: player.userId, ipHash: player.ipHash, name: player.name, avatar: player.avatar });
   touch(room, player);
   broadcast(room);
   maybeEndUploadEarly(room);
@@ -1632,8 +1635,10 @@ function memeContext(entry) {
 function handleReport(ws, room, player, msg) {
   const cur = room.current;
   const reason = String(msg.reason || '');
-  // a report about the picture itself goes to whoever brought it (swap round), not to the caption author
-  const responsible = (entry) => (reason === 'upload' && entry.from && room.players.get(entry.from)) || room.players.get(entry.pid) || null;
+  // A report about the picture itself goes to whoever brought it (swap round), not to the caption
+  // author - also when the bringer has left or was kicked in the meantime.
+  const bringer = (entry) => (reason === 'upload' && entry.from ? room.players.get(entry.from) || room.bringers.get(entry.from) : null);
+  const responsible = (entry) => bringer(entry) || room.players.get(entry.pid) || null;
   let target = null;
   let context = null;
   if (msg.target === 'vote') {
