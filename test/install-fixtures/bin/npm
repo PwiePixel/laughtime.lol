@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# Test double for npm: no network, no real packages.
+set -u
+echo "npm $*" >>"$STUB_LOG"
+case "$*" in
+  'prefix -g') echo "$STUB_STATE/npm-global" ;;
+  ci*|install*) [ "${2:-}" = '-g' ] || mkdir -p node_modules ;;
+esac
+exit 0

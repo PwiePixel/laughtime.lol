@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# Test double for curl: answers the health checks and records the webhook post.
+set -u
+url="${!#}"
+data='' config=0 prev=''
+for arg in "$@"; do
+  [ "$prev" = '-d' ] && data="$arg"
+  [ "$prev" = '-K' ] && [ "$arg" = '-' ] && config=1
+  prev="$arg"
+done
+if [ "$config" = 1 ]; then
+  # the address comes on stdin, so it never shows up in a process list
+  read -r line
+  echo "curl webhook $line" >>"$STUB_LOG"
+  printf '%s' "$data" >"$STUB_STATE/webhook-payload"
+  exit "${STUB_WEBHOOK_EXIT:-0}"
+fi
+echo "curl $url" >>"$STUB_LOG"
+case "$url" in
+  http://127.0.0.1:*|http://localhost:*) printf '%s' "${STUB_LOCAL_HTTP:-200}" ;;
+  https://*/api/status) printf '%s' "${STUB_PUBLIC_HTTP:-200}" ;;
+  *) echo "unexpected download in a test: $url" >&2; exit 22 ;;
+esac

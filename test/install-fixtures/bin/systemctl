@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# Test double for systemctl: records the calls and remembers which units run.
+set -u
+echo "systemctl $*" >>"$STUB_LOG"
+unit="${!#}"
+case "$1" in
+  is-active) [ -e "$STUB_STATE/active-$unit" ] || exit 3 ;;
+  enable)    case " $* " in *' --now '*) : >"$STUB_STATE/active-$unit" ;; esac ;;
+  start|restart) : >"$STUB_STATE/active-$unit" ;;
+  disable|stop)  rm -f "$STUB_STATE/active-$unit" ;;
+esac
+exit 0

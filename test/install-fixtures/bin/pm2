@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# Test double for PM2: records the calls and remembers the process names.
+set -u
+echo "pm2 $*" >>"$STUB_LOG"
+name=''
+prev=''
+for arg in "$@"; do
+  [ "$prev" = '--name' ] && name="$arg"
+  prev="$arg"
+done
+case "${1:-}" in
+  --version) echo '7.0.0' ;;
+  describe)  [ -e "$STUB_STATE/pm2-$2" ] || exit 1 ;;
+  pid)       [ -e "$STUB_STATE/pm2-$2" ] && echo 4242 ;;
+  start)     : >"$STUB_STATE/pm2-$name"
+             echo "pm2-env $name NODE_ENV=${NODE_ENV:-} SERVER_PORT=${SERVER_PORT:-}" >>"$STUB_LOG" ;;
+  delete)    rm -f "$STUB_STATE/pm2-$2" ;;
+  logs)      echo 'log lines of the test double' ;;
+esac
+exit 0

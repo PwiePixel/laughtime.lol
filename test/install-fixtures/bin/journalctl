@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+echo "journalctl $*" >>"$STUB_LOG"
+echo 'journal lines of the test double'

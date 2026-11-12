@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+# Test double for cloudflared: records its arguments and plays the answers of
+# the real program (login, tunnel list/create, DNS routes) without any network.
+set -u
+echo "cloudflared $*" >>"$STUB_LOG"
+id="${STUB_TUNNEL_ID:-11111111-2222-3333-4444-555555555555}"
+home="$HOME/.cloudflared"
+
+case "$*" in
+  --version)
+    echo 'cloudflared version 2026.1.0 (test double)'
+    ;;
+  'tunnel login')
+    echo 'Please open the following URL and log in with your Cloudflare account:'
+    echo
+    echo 'https://dash.cloudflare.com/argotunnel?aud=&callback=https%3A%2F%2Flogin.cloudflareaccess.org%2Fstub-token'
+    echo
+    echo 'Leave cloudflared running to download the cert automatically.'
+    if [ -n "${STUB_LOGIN_NEVER:-}" ]; then sleep 30; exit 1; fi
+    sleep "${STUB_LOGIN_DELAY:-1}"
+    mkdir -p "$home"
+    echo 'stub certificate' >"$home/cert.pem"
+    echo 'You have successfully logged in.'
+    ;;
+  'tunnel list --output json --name '*)
+    name="${!#}"
+    if [ -e "$STUB_STATE/tunnel-$name" ]; then
+      printf '[{"id":"%s","name":"%s","created_at":"2026-01-01T00:00:00Z","deleted_at":"0001-01-01T00:00:00Z","connections":[]}]\n' "$id" "$name"
+    else
+      # the real program prints "null" for an empty list
+      echo 'null'
+    fi
+    ;;
+  'tunnel create '*)
+    name="${!#}"
+    mkdir -p "$home"
+    printf '{"AccountTag":"stub","TunnelSecret":"stub","TunnelID":"%s"}\n' "$id" >"$home/$id.json"
+    : >"$STUB_STATE/tunnel-$name"
+    echo "Created tunnel $name with id $id"
+    ;;
+  'tunnel token --cred-file '*)
+    printf '{"AccountTag":"stub","TunnelSecret":"fetched","TunnelID":"%s"}\n' "$id" >"$4"
+    ;;
+  'tunnel route dns --overwrite-dns '*)
+    host="${!#}"
+    if [ "$host" = "${STUB_DNS_FAIL:-}" ]; then
+      echo "Failed to add route: code: 1003, reason: An A, AAAA, or CNAME record with that host already exists." >&2
+      exit 1
+    elif [ "$host" = "${STUB_DNS_WRONG_ZONE:-}" ]; then
+      echo "INF Added CNAME $host.other-zone.test which will route to this tunnel tunnelID=$id"
+    else
+      echo "INF Added CNAME $host which will route to this tunnel tunnelID=$id"
+    fi
+    ;;
+  'tunnel --config '*' ingress validate')
+    [ -r "$3" ] || { echo "config $3 not readable" >&2; exit 1; }
+    grep -q 'http_status:404' "$3" || { echo 'The last ingress rule must match all URLs' >&2; exit 1; }
+    echo 'Validating rules from '"$3"; echo 'OK'
+    ;;
+esac
+exit 0

@@ -40,6 +40,8 @@ LimitNOFILE=65536
 # cache - so there is no ProtectHome here and no MemoryDenyWriteExecute
 # (the JavaScript engine compiles code at runtime).
 NoNewPrivileges=true
+# database, uploads and logs of the app are nobody else's business
+UMask=0027
 PrivateTmp=true
 PrivateDevices=true
 ProtectSystem=full

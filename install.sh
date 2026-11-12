@@ -91,7 +91,7 @@ MANAGER='none'
 NODE_BIN='' NODE_DIR='' PM2_BIN='' PM2_ENV=() CLOUDFLARED_BIN=''
 DOMAIN='' BETA_DOMAIN='' PORT='' ENV_PORT='' PORT_OVERRIDE=0 LOCAL_HOST='127.0.0.1'
 TUNNEL_NAME='' TUNNEL_ID='' TUNNEL_UNIT='' CF_CONFIG='' HOSTNAMES=()
-DEPS_CHANGED=0 BUILD_CHANGED=0
+DATA_CREATED=0 DEPS_CHANGED=0 BUILD_CHANGED=0
 APP_STATUS='' TUNNEL_STATUS='' PUBLIC_OK='' DNS_FAILED=()
 
 # ---------------------------------------------------------------------------
@@ -261,8 +261,23 @@ ask() {       # <question> <default> -> answer on stdout
 # ---------------------------------------------------------------------------
 have() { command -v "$1" >/dev/null 2>&1; }
 
-# path below the test prefix (the real path in normal use)
-dst() { printf '%s%s' "$ROOT_PREFIX" "$1"; }
+# system paths end up below the test prefix (the real path in normal use)
+dst() {
+  case "$1" in
+    /etc/*|/usr/*|/swapfile*) printf '%s%s' "$ROOT_PREFIX" "$1" ;;
+    *) printf '%s' "$1" ;;
+  esac
+}
+
+# shellcheck disable=SC2317  # called by name, see writer_for
+plain() { "$@"; }
+
+# who has to write a file: the user itself where it may, root everywhere else
+writer_for() {   # <path>
+  local dir=$1
+  while [[ ! -e "$dir" && "$dir" != / ]]; do dir=$(dirname "$dir"); done
+  if [[ -w "$dir" ]]; then printf 'plain'; else printf 'as_root'; fi
+}
 
 trim() {
   local s=$1
@@ -363,7 +378,8 @@ as_root() {
 # creates (node_modules, .next, data) belong to the account that runs the app
 as_app() {
   local path="$PATH"
-  [[ -z "$NODE_DIR" ]] || path="$NODE_DIR:$PATH"
+  # the service user needs the folder of the chosen Node.js on its PATH (npm)
+  case ":$PATH:" in *":$NODE_DIR:"*) ;; *) path="$NODE_DIR:$PATH" ;; esac
   if [[ "$SERVICE_USER" == "$CURRENT_USER" ]]; then
     PATH="$path" "$@"
   elif (( EUID == 0 )) && have runuser; then
@@ -633,7 +649,7 @@ resolve_manager() {
   fi
   if [[ "$MANAGER" == systemd ]]; then
     CF_CONFIG="/etc/cloudflared/$TUNNEL_NAME.yml"
-  elif [[ "$MANAGER" == pm2 ]]; then
+  elif [[ "$MANAGER" == pm2 && "$SERVICE_USER" != "$CURRENT_USER" ]]; then
     CF_CONFIG="$SERVICE_HOME/.cloudflared/$TUNNEL_NAME.yml"
   else
     CF_CONFIG="$HOME/.cloudflared/$TUNNEL_NAME.yml"
@@ -656,6 +672,8 @@ disk_free_mb() { df -Pm "$1" 2>/dev/null | awk 'NR == 2 { print $4 }'; }
 # packages
 # ---------------------------------------------------------------------------
 pkg_install() {   # <package...>
+  # a package manager cannot be pointed at the test prefix
+  if [[ -n "$ROOT_PREFIX" ]]; then note "Test prefix active – not installing system packages ($*)."; return 1; fi
   case "$PKG" in
     apt)
       if (( ! APT_UPDATED )); then
@@ -788,7 +806,7 @@ step_update_source() {
 # ---------------------------------------------------------------------------
 install_node_nodesource() {   # <major>
   local line=$1 script
-  [[ "$ARCH" != unsupported* && "$LIBC" == glibc ]] || return 1
+  [[ "$ARCH" != unsupported* && "$LIBC" == glibc && -z "$ROOT_PREFIX" ]] || return 1
   tmp_dir
   script="$TMP_DIR/nodesource-setup.sh"
   case "$PKG" in
@@ -935,7 +953,9 @@ step_project() {
     warn '.env.example is missing – the app starts with its built-in defaults.'
   fi
 
-  if [[ -d "$DATA_DIR" ]]; then
+  if (( DATA_CREATED )); then
+    ok 'data/ created'
+  elif [[ -d "$DATA_DIR" ]]; then
     ok 'data/ exists'
   elif (( DRY_RUN )); then
     dry "mkdir -p $DATA_DIR"
@@ -950,6 +970,12 @@ step_project() {
     if (( DRY_RUN )); then dry "create the system user \"$SERVICE_USER\" (home $SERVICE_HOME, no login)"; else create_service_user; fi
   fi
   if (( CHOWN_TREE )); then
+    # check before anything is handed over: an account that cannot even get
+    # to the folder would end up with files it can never use
+    if { (( CREATE_USER )) && ! reachable_by_others "$(dirname "$APP_DIR")"; } \
+      || { (( ! CREATE_USER && ! DRY_RUN )) && ! as_app test -x "$(dirname "$APP_DIR")" 2>/dev/null; }; then
+      die "The user \"$SERVICE_USER\" cannot reach $APP_DIR (a parent folder is closed for other accounts). Move the project, e.g. to /opt/laughtime, or choose another --user."
+    fi
     note "The app runs as \"$SERVICE_USER\", so the project folder is handed over to that account."
     quiet as_root chown -R "$SERVICE_USER:$SERVICE_GROUP" "$APP_DIR" || die "Could not change the owner of $APP_DIR."
     OWNER_REF=$(stat -c %u:%g "$APP_DIR")
@@ -1076,11 +1102,12 @@ step_app() {
 # ---------------------------------------------------------------------------
 # step: process manager
 # ---------------------------------------------------------------------------
-# writes a root-owned file when its content changed; returns 0 when it wrote
-install_root_file() {   # <real path> <mode> <content>
-  local path=$1 mode=$2 content=$3 target tmp
+# writes a file when its content changed; returns 0 when it wrote
+install_file() {   # <real path> <mode> <content>
+  local path=$1 mode=$2 content=$3 target tmp writer
   target=$(dst "$path")
-  if [[ -f "$target" && "$(as_root cat "$target" 2>/dev/null)" == "$content" ]]; then return 1; fi
+  writer=$(writer_for "$target")
+  if [[ -f "$target" && "$("$writer" cat "$target" 2>/dev/null)" == "$content" ]]; then return 1; fi
   if (( DRY_RUN )); then
     dry "write $target (mode $mode):"
     printf '%s\n' "$content" | sed "s/^/      ${C_DIM}|${C_RESET} /"
@@ -1089,8 +1116,8 @@ install_root_file() {   # <real path> <mode> <content>
   tmp_dir
   tmp=$(mktemp "$TMP_DIR/file.XXXXXX")
   printf '%s\n' "$content" >"$tmp"
-  as_root mkdir -p "$(dirname "$target")"
-  as_root install -m "$mode" "$tmp" "$target"
+  "$writer" mkdir -p "$(dirname "$target")"
+  "$writer" install -m "$mode" "$tmp" "$target"
   rm -f -- "$tmp"
   log_line "  wrote $target (mode $mode)"
   return 0
@@ -1125,7 +1152,7 @@ render_tunnel_unit() {
 # so a second run does not throw the players out of their rooms
 systemd_apply() {   # <unit name> <content> <restart needed 0|1>
   local unit=$1 content=$2 restart=$3
-  if install_root_file "/etc/systemd/system/$unit" 644 "$content"; then
+  if install_file "/etc/systemd/system/$unit" 644 "$content"; then
     ok "Unit $unit written"
     quiet as_root systemctl daemon-reload || die 'systemctl daemon-reload failed.'
     restart=1
@@ -1133,7 +1160,7 @@ systemd_apply() {   # <unit name> <content> <restart needed 0|1>
     ok "Unit $unit is unchanged"
   fi
   if (( DRY_RUN )); then
-    dry "sudo systemctl enable --now $unit"
+    dry "$(quote_cmd as_root systemctl enable --now "$unit")"
     return 0
   fi
   if as_root systemctl is-active --quiet "$unit" 2>/dev/null; then
@@ -1375,6 +1402,11 @@ show_login_output() {
   done
 }
 
+stop_job() {   # <pid>
+  kill "$1" 2>/dev/null || true
+  wait "$1" 2>/dev/null || true
+}
+
 cf_login() {
   local cert fifo login_pid reader_pid start=$SECONDS rc=0
   cert=$(cf_cert_path)
@@ -1405,9 +1437,8 @@ cf_login() {
       break
     fi
     if (( SECONDS - start >= LOGIN_TIMEOUT )); then
-      kill "$login_pid" 2>/dev/null || true
-      wait "$login_pid" 2>/dev/null || true
-      wait "$reader_pid" 2>/dev/null || true
+      stop_job "$login_pid"
+      stop_job "$reader_pid"
       CHILD_PID=''
       die "No authorisation within $((LOGIN_TIMEOUT / 60)) minutes. Nothing is lost: run the script again and open the link it shows. Without a browser at hand: copy the link to any device – it only has to be opened by somebody who is logged in to the Cloudflare account."
     fi
@@ -1416,9 +1447,10 @@ cf_login() {
   # cloudflared ends by itself right after it has written the certificate
   local waited=0
   while kill -0 "$login_pid" 2>/dev/null && (( waited < 10 )); do sleep 1; waited=$((waited + 1)); done
-  kill "$login_pid" 2>/dev/null || true
-  wait "$login_pid" 2>/dev/null || true
-  wait "$reader_pid" 2>/dev/null || true
+  stop_job "$login_pid"
+  # the reader ends with the last line of cloudflared; never wait for it longer
+  sleep 0.3
+  stop_job "$reader_pid"
   CHILD_PID=''
   rm -f -- "$fifo"
   [[ -s "$cert" ]] || die "cloudflared tunnel login ended without a certificate (exit code $rc). Details: $LOG_FILE. Try again; if a browser cannot be reached from this server, open the link on another device."
@@ -1498,48 +1530,48 @@ render_cf_config() {   # <credentials path as the service sees it>
 
 # returns 0 when the configuration changed
 cf_config() {
-  local cf_home creds_src conf_dir creds_dst content target backup changed=1
+  local cf_home creds_src conf_dir creds_dst content target backup writer host
   cf_home=$(dirname "$(cf_cert_path)")
   creds_src="$cf_home/$TUNNEL_ID.json"
   conf_dir=$(dirname "$CF_CONFIG")
   creds_dst="$conf_dir/$TUNNEL_ID.json"
   target=$(dst "$CF_CONFIG")
+  writer=$(writer_for "$target")
 
   # the service reads its own copy of the credentials: a systemd service has
   # no access to home folders, a PM2 process runs as the service user
   if [[ "$conf_dir" != "$cf_home" ]]; then
     if (( DRY_RUN )); then
       dry "install -m 600 $creds_src $(dst "$creds_dst")"
-    elif [[ ! -f "$(dst "$creds_dst")" ]] || ! as_root cmp -s "$creds_src" "$(dst "$creds_dst")"; then
-      as_root mkdir -p "$(dst "$conf_dir")"
-      as_root install -m 600 "$creds_src" "$(dst "$creds_dst")" || die "Could not copy the tunnel credentials to $conf_dir."
-      if [[ "$MANAGER" == pm2 && -z "$ROOT_PREFIX" ]]; then
-        as_root chown "$SERVICE_USER:$SERVICE_GROUP" "$(dst "$conf_dir")" "$(dst "$creds_dst")" || true
+    elif [[ ! -f "$(dst "$creds_dst")" ]] || ! "$writer" cmp -s "$creds_src" "$(dst "$creds_dst")"; then
+      "$writer" mkdir -p "$(dst "$conf_dir")"
+      "$writer" install -m 600 "$creds_src" "$(dst "$creds_dst")" || die "Could not copy the tunnel credentials to $conf_dir."
+      if [[ "$MANAGER" == pm2 ]]; then
+        "$writer" chown "$SERVICE_USER:$SERVICE_GROUP" "$(dst "$conf_dir")" "$(dst "$creds_dst")" || true
       fi
       ok "Tunnel credentials copied to $creds_dst (mode 600)"
     fi
   fi
 
   content=$(render_cf_config "$creds_dst")
-  if [[ -f "$target" && "$(as_root cat "$target" 2>/dev/null)" == "$content" ]]; then
+  if [[ -f "$target" && "$("$writer" cat "$target" 2>/dev/null)" == "$content" ]]; then
     ok "Tunnel configuration $CF_CONFIG is unchanged"
     return 1
   fi
   if [[ -f "$target" ]] && (( ! DRY_RUN )); then
     backup="$target.bak-$(date +%Y%m%d-%H%M%S)"
-    as_root cp -p "$target" "$backup"
+    "$writer" cp -p "$target" "$backup"
     ok "Previous configuration saved as ${backup#"$ROOT_PREFIX"}"
   fi
-  install_root_file "$CF_CONFIG" 644 "$content" || true
+  install_file "$CF_CONFIG" 644 "$content" || true
   if (( DRY_RUN )); then return 0; fi
-  if [[ "$MANAGER" == pm2 && -z "$ROOT_PREFIX" && "$conf_dir" != "$cf_home" ]]; then as_root chown "$SERVICE_USER:$SERVICE_GROUP" "$target" || true; fi
+  if [[ "$MANAGER" == pm2 && "$conf_dir" != "$cf_home" ]]; then "$writer" chown "$SERVICE_USER:$SERVICE_GROUP" "$target" || true; fi
   ok "Tunnel configuration written: $CF_CONFIG"
   for host in "${HOSTNAMES[@]}"; do info "  $host -> http://${LOCAL_HOST/127.0.0.1/localhost}:$PORT"; done
-  if ! as_root "$CLOUDFLARED_BIN" tunnel --config "$target" ingress validate >>"$LOG_FILE" 2>&1; then
+  if ! "$writer" "$CLOUDFLARED_BIN" tunnel --config "$target" ingress validate >>"$LOG_FILE" 2>&1; then
     die "cloudflared does not accept the configuration $CF_CONFIG (details: $LOG_FILE)."
   fi
-  changed=0
-  return "$changed"
+  return 0
 }
 
 cf_dns() {
@@ -1714,7 +1746,13 @@ step_summary() {
   fi
   case "$PUBLIC_OK" in
     1) box_line "Public      ${C_GREEN}https://$DOMAIN answers${C_RESET}" ;;
-    0) box_line "Public      ${C_YELLOW}https://$DOMAIN does not answer yet${C_RESET} (DNS can take a few minutes)" ;;
+    0)
+      if (( WANT_TUNNEL )); then
+        box_line "Public      ${C_YELLOW}https://$DOMAIN does not answer yet${C_RESET} (DNS can take a few minutes)"
+      else
+        box_line "Public      ${C_YELLOW}https://$DOMAIN does not answer${C_RESET} – point your reverse proxy at port $PORT"
+      fi
+      ;;
     *) box_line 'Public      not checked' ;;
   esac
   box_rule
@@ -1746,7 +1784,8 @@ step_summary() {
 # uninstall
 # ---------------------------------------------------------------------------
 uninstall() {
-  local unit target id='' f removed=0 conf
+  local unit target id='' f removed=0 conf writer creds cf_home
+  cf_home=$(dirname "$(cf_cert_path)")
   STEP_TOTAL=1
   step 'Uninstall'
   info 'Removes the services and the tunnel configuration of this installation.'
@@ -1786,18 +1825,20 @@ uninstall() {
   for conf in "/etc/cloudflared/$TUNNEL_NAME.yml" "$SERVICE_HOME/.cloudflared/$TUNNEL_NAME.yml" "$HOME/.cloudflared/$TUNNEL_NAME.yml"; do
     target=$(dst "$conf")
     [[ -f "$target" ]] || continue
-    if ! as_root grep -qF -- "$MANAGED_MARK" "$target" 2>/dev/null; then
+    writer=$(writer_for "$target")
+    if ! "$writer" grep -qF -- "$MANAGED_MARK" "$target" 2>/dev/null; then
       note "$conf was not written by this script – left alone."
       continue
     fi
     # shellcheck disable=SC2016  # awk program
-    id=$(as_root awk '$1 == "tunnel:" { print $2; exit }' "$target" 2>/dev/null || true)
-    quiet as_root rm -f -- "$target"
+    id=$("$writer" awk '$1 == "tunnel:" { print $2; exit }' "$target" 2>/dev/null || true)
+    quiet "$writer" rm -f -- "$target"
     for f in "$target".bak-*; do
-      [[ -e "$f" ]] && quiet as_root rm -f -- "$f"
+      if [[ -e "$f" ]]; then quiet "$writer" rm -f -- "$f"; fi
     done
-    if [[ "$conf" == /etc/cloudflared/* && "$id" =~ ^[0-9a-fA-F-]{36}$ && -f "$(dst "/etc/cloudflared/$id.json")" ]]; then
-      quiet as_root rm -f -- "$(dst "/etc/cloudflared/$id.json")"
+    creds="$(dirname "$target")/$id.json"
+    if [[ "$(dirname "$conf")" != "$cf_home" && "$id" =~ ^[0-9a-fA-F-]{36}$ && -f "$creds" ]]; then
+      quiet "$writer" rm -f -- "$creds"
     fi
     ok "Removed the tunnel configuration $conf"
     removed=1
@@ -1817,7 +1858,8 @@ uninstall() {
 # ---------------------------------------------------------------------------
 start_log() {
   (( DRY_RUN )) && return 0
-  if [[ ! -d "$DATA_DIR" ]]; then mkdir -p "$DATA_DIR" 2>/dev/null && own "$DATA_DIR"; fi
+  # the log lives in data/, so the folder is needed from the first line on
+  if [[ ! -d "$DATA_DIR" ]] && mkdir -p "$DATA_DIR" 2>/dev/null; then DATA_CREATED=1; own "$DATA_DIR"; fi
   if : >>"$LOG_FILE" 2>/dev/null; then
     LOG_READY=1
     own "$LOG_FILE"

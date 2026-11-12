@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# With LT_INSTALL_ROOT set the installer must never ask for root rights.
+echo "sudo $*" >>"$STUB_LOG"
+echo 'sudo must not be called in a test' >&2
+exit 97
