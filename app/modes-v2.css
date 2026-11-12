@@ -55,7 +55,8 @@
 
 /* --- sub line of a phase / last call -------------------------------- */
 .phase-sub {
-  min-height: 1.6em;
+  /* the last-call notice below is exactly as tall, so nothing moves when it takes this place */
+  min-height: 28px;
 }
 
 /* phones show the short hint (one line, never cut off) */
@@ -64,9 +65,12 @@
 }
 
 .last-call {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 6px;
+  box-sizing: border-box;
+  width: fit-content;
+  height: 28px;
   max-width: 100%;
   padding: 0 12px 0 8px;
   border: 2px solid var(--ink);
@@ -1354,6 +1358,8 @@ button.strip-player {
 
 .award-card {
   display: grid;
+  /* one column that may shrink: long names and titles stay inside the card */
+  grid-template-columns: minmax(0, 1fr);
   align-content: start;
   justify-items: center;
   flex: 0 1 200px;
@@ -1406,8 +1412,10 @@ button.strip-player {
 }
 
 .award-title {
+  max-width: 100%;
   font-size: 1.05rem;
   line-height: 1.15;
+  overflow-wrap: anywhere;
 }
 
 .award-who {
@@ -1426,6 +1434,7 @@ button.strip-player {
 }
 
 .award-value {
+  max-width: 100%;
   color: var(--muted);
   font-size: 0.82rem;
   font-weight: 600;
@@ -1487,10 +1496,15 @@ button.strip-player {
   }
 
   .phase-sub {
+    min-height: 26px;
     overflow: hidden;
     font-size: 0.9rem;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .last-call {
+    height: 26px;
   }
 
   .has-short .sub-full {
