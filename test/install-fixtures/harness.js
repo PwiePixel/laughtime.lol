@@ -36,10 +36,13 @@ export function sandbox(t) {
     root: path.join(base, 'root'),
     home: path.join(base, 'home'),
     state: path.join(base, 'state'),
+    // a copy, so another account can run the test doubles too
+    bin: path.join(base, 'bin'),
     log: path.join(base, 'calls.log'),
   };
   for (const dir of [dirs.root, dirs.home, dirs.state]) fs.mkdirSync(dir, { recursive: true });
   fs.cpSync(path.join(HERE, 'project'), dirs.project, { recursive: true });
+  fs.cpSync(path.join(HERE, 'bin'), dirs.bin, { recursive: true });
   fs.cpSync(INSTALLER, path.join(dirs.project, 'install.sh'));
   fs.cpSync(path.join(REPO, 'deploy'), path.join(dirs.project, 'deploy'), { recursive: true });
   fs.writeFileSync(dirs.log, '');
@@ -53,7 +56,7 @@ export function sandbox(t) {
       // no terminal: the installer must not wait for an answer
       stdio: ['ignore', 'pipe', 'pipe'],
       env: {
-        PATH: `${path.join(HERE, 'bin')}:${path.dirname(process.execPath)}:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin`,
+        PATH: `${dirs.bin}:${path.dirname(process.execPath)}:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin`,
         HOME: dirs.home,
         LANG: 'C.UTF-8',
         TERM: 'dumb',

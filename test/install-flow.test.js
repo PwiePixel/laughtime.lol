@@ -1,10 +1,11 @@
 // End-to-end runs of install.sh against test doubles: .env protection, the
 // systemd and PM2 branches, the Cloudflare Tunnel flow, uninstall.
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
-import { TUNNEL_ID, callIndex, mode, sandbox, sha256, skipReason } from './install-fixtures/harness.js';
+import { TUNNEL_ID, callIndex, has, mode, sandbox, sha256, skipReason } from './install-fixtures/harness.js';
 
 const skip = skipReason() || false;
 const FULL = (box) => ['--yes', '--user', box.user, '--domain', 'example.test', '--port', '4321'];
@@ -281,4 +282,41 @@ test('without systemd the app and the tunnel run with PM2', { skip }, (t) => {
   assert.equal(fs.existsSync(config), false);
   assert.ok(fs.existsSync(path.join(box.home, '.cloudflared', `${TUNNEL_ID}.json`)), 'the original credentials were deleted');
   assert.ok(fs.existsSync(path.join(box.project, '.env')));
+});
+
+// only possible as root: the project is handed over to another account and
+// everything inside it (npm, build, PM2) runs as that account
+const otherUser = (() => {
+  if (skip) return '';
+  if (typeof process.getuid !== 'function' || process.getuid() !== 0 || !has('runuser')) return '';
+  const res = spawnSync('id', ['-u', 'nobody'], { encoding: 'utf8' });
+  return res.status === 0 && res.stdout.trim() !== '0' ? 'nobody' : '';
+})();
+
+test('a separate service account owns and runs the project', { skip: skip || (!otherUser && 'needs root, runuser and the account "nobody"') }, (t) => {
+  const box = sandbox(t);
+  // the account has to reach the project and the test doubles write their notes as that account
+  fs.chmodSync(box.base, 0o755);
+  fs.chmodSync(box.state, 0o777);
+  fs.chmodSync(box.log, 0o666);
+  const whoami = path.join(box.project, 'whoami');
+  fs.appendFileSync(path.join(box.project, 'index.js'), `\nfs.writeFileSync(${JSON.stringify(whoami)}, String(process.getuid()));\n`);
+
+  const res = box.run(['--yes', '--user', otherUser, '--domain', 'example.test', '--no-tunnel'], { LT_INSTALL_INIT: 'none' });
+  assert.equal(res.code, 0, res.out);
+  const uid = Number(spawnSync('id', ['-u', otherUser], { encoding: 'utf8' }).stdout);
+  assert.match(res.out, new RegExp(`Owner of ${box.project} is now ${otherUser}`));
+  for (const file of ['', '.env', 'data', '.next/BUILD_ID', 'node_modules']) {
+    assert.equal(fs.statSync(path.join(box.project, file)).uid, uid, `${file || 'project folder'} has the wrong owner`);
+  }
+  assert.equal(mode(path.join(box.project, '.env')), '600');
+  assert.equal(fs.readFileSync(whoami, 'utf8'), String(uid), 'the build did not run as the service account');
+  callIndex(box.calls(), `pm2 start ${box.project}/index.js --name laughtime`);
+
+  // an account that cannot reach the folder is refused before anything is handed over
+  const closed = sandbox(t);
+  const refused = closed.run(['--yes', '--user', otherUser, '--no-tunnel'], { LT_INSTALL_INIT: 'none' });
+  assert.equal(refused.code, 1, refused.out);
+  assert.match(refused.out, /cannot reach/);
+  assert.equal(fs.statSync(closed.project).uid, 0);
 });

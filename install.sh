@@ -80,6 +80,7 @@ TMP_DIR=''
 CHILD_PID=''
 SWAP_FILE=''
 SUDO_READY=0
+SUDO_HINT='sudo '                    # prefix of the commands the user is told to run
 APT_UPDATED=0
 WARNINGS=()
 C_RESET='' C_BOLD='' C_DIM='' C_RED='' C_GREEN='' C_YELLOW='' C_MAGENTA='' C_CYAN=''
@@ -992,6 +993,7 @@ step_project() {
   fi
   ok "The app runs as: $SERVICE_USER"
 
+  if (( WANT_TUNNEL )); then check_env_hosts; fi
   trust=$(env_get TRUST_PROXY); trust=${trust,,}
   if (( WANT_TUNNEL )) && [[ "$trust" == false || "$trust" == 0 || "$trust" == no || "$trust" == off ]]; then
     warn 'TRUST_PROXY is switched off in .env. Behind the Cloudflare Tunnel it must be TRUST_PROXY=true, otherwise every player has the same IP address (rate limits, bans). Please change it in .env.'
@@ -1000,9 +1002,28 @@ step_project() {
   fi
 }
 
+# the app only knows what .env tells it – say so when the tunnel serves other names
+check_env_hosts() {
+  local public_host beta_hosts
+  public_host=$(host_of_url "$(env_get PUBLIC_URL)")
+  [[ -n "$public_host" ]] || public_host='laughtime.lol'
+  public_host=${public_host#www.}
+  if [[ "$public_host" != "$DOMAIN" ]]; then
+    warn "PUBLIC_URL in .env points to $public_host, but the tunnel serves $DOMAIN. Set PUBLIC_URL=https://$DOMAIN in .env (invite links, login with Discord), then: $(restart_hint)"
+  fi
+  if (( WANT_BETA )); then
+    beta_hosts=$(env_get BETA_HOSTS); beta_hosts=${beta_hosts,,}; beta_hosts=${beta_hosts// /}
+    [[ -n "$beta_hosts" ]] || beta_hosts="beta.$public_host"
+    case ",$beta_hosts," in
+      *",$BETA_DOMAIN,"*) ;;
+      *) warn "The app shows the beta on $beta_hosts, not on $BETA_DOMAIN. Add BETA_HOSTS=$BETA_DOMAIN to .env, otherwise $BETA_DOMAIN shows the normal page." ;;
+    esac
+  fi
+}
+
 restart_hint() {
   case "$MANAGER" in
-    systemd) printf 'sudo systemctl restart %s' "${SERVICE_NAME%.service}" ;;
+    systemd) printf '%ssystemctl restart %s' "$SUDO_HINT" "${SERVICE_NAME%.service}" ;;
     pm2)     printf 'pm2 restart %s' "$APP_NAME" ;;
     *)       printf 'restart the app' ;;
   esac
@@ -1277,7 +1298,7 @@ step_service() {
     [[ "$APP_DIR" =~ ^/[A-Za-z0-9_./@+,-]*$ ]] || die "The project path \"$APP_DIR\" contains characters a systemd unit cannot handle safely (spaces, quotes, …). Move the project, e.g. to /opt/laughtime."
     systemd_apply "$SERVICE_NAME" "$(render_app_unit)" "$restart" || {
       show_app_logs
-      die "Could not start $SERVICE_NAME – see the log lines above (sudo journalctl -u ${SERVICE_NAME%.service} -e)."
+      die "Could not start $SERVICE_NAME – see the log lines above (${SUDO_HINT}journalctl -u ${SERVICE_NAME%.service} -e)."
     }
   else
     ensure_pm2
@@ -1378,7 +1399,19 @@ ensure_cloudflared() {
   ok "cloudflared installed ($("$CLOUDFLARED_BIN" --version 2>/dev/null | head -n 1))"
 }
 
-cf_cert_path() { printf '%s' "${TUNNEL_ORIGIN_CERT:-$HOME/.cloudflared/cert.pem}"; }
+# the certificate of "cloudflared tunnel login"; cloudflared looks in the same places
+cf_cert_path() {
+  local dir
+  if [[ -n "${TUNNEL_ORIGIN_CERT:-}" ]]; then printf '%s' "$TUNNEL_ORIGIN_CERT"; return 0; fi
+  for dir in "$HOME/.cloudflared" "$HOME/.cloudflare-warp" "$HOME/cloudflare-warp"; do
+    if [[ -s "$dir/cert.pem" ]]; then printf '%s' "$dir/cert.pem"; return 0; fi
+  done
+  printf '%s' "$HOME/.cloudflared/cert.pem"
+}
+
+duration_text() {   # <seconds>
+  if (( $1 >= 120 )); then printf '%d minutes' "$(($1 / 60))"; else printf '%d seconds' "$1"; fi
+}
 
 rule() { printf '%s%s%s\n' "$C_YELLOW" '======================================================================' "$C_RESET"; }
 
@@ -1440,7 +1473,7 @@ cf_login() {
       stop_job "$login_pid"
       stop_job "$reader_pid"
       CHILD_PID=''
-      die "No authorisation within $((LOGIN_TIMEOUT / 60)) minutes. Nothing is lost: run the script again and open the link it shows. Without a browser at hand: copy the link to any device – it only has to be opened by somebody who is logged in to the Cloudflare account."
+      die "No authorisation within $(duration_text "$LOGIN_TIMEOUT"). Nothing is lost: run the script again and open the link it shows. Without a browser at hand: copy the link to any device – it only has to be opened by somebody who is logged in to the Cloudflare account."
     fi
     sleep 2
   done
@@ -1610,7 +1643,7 @@ cf_service() {   # <restart needed 0|1>
     systemd)
       systemd_apply "$TUNNEL_UNIT" "$(render_tunnel_unit)" "$restart" || {
         as_root journalctl -u "$TUNNEL_UNIT" -n 20 --no-pager 2>&1 | sed 's/^/      /' >&2 || true
-        die "Could not start $TUNNEL_UNIT (sudo journalctl -u ${TUNNEL_UNIT%.service} -e)."
+        die "Could not start $TUNNEL_UNIT (${SUDO_HINT}journalctl -u ${TUNNEL_UNIT%.service} -e)."
       }
       TUNNEL_STATUS="systemd unit $TUNNEL_UNIT"
       ;;
@@ -1758,9 +1791,9 @@ step_summary() {
   box_rule
   case "$MANAGER" in
     systemd)
-      box_line "Logs        sudo journalctl -u ${SERVICE_NAME%.service} -f"
-      (( ! WANT_TUNNEL )) || box_line "            sudo journalctl -u ${TUNNEL_UNIT%.service} -f"
-      box_line "Restart     sudo systemctl restart ${SERVICE_NAME%.service}"
+      box_line "Logs        ${SUDO_HINT}journalctl -u ${SERVICE_NAME%.service} -f"
+      (( ! WANT_TUNNEL )) || box_line "            ${SUDO_HINT}journalctl -u ${TUNNEL_UNIT%.service} -f"
+      box_line "Restart     ${SUDO_HINT}systemctl restart ${SERVICE_NAME%.service}"
       ;;
     pm2)
       box_line "Logs        pm2 logs $APP_NAME     (as $SERVICE_USER)"
@@ -1904,6 +1937,7 @@ main() {
   trap on_signal INT TERM
 
   if (( ! ASSUME_YES )) && [[ -t 0 ]]; then INTERACTIVE=1; fi
+  if (( EUID == 0 )); then SUDO_HINT=''; fi
   # the new installer after "git pull" already has the user's go-ahead
   [[ -z "${LT_INSTALL_REEXEC:-}" ]] || INTERACTIVE=0
 
