@@ -1,6 +1,7 @@
 import { cookies } from 'next/headers';
 import { LANG_COOKIE, normalizeLang } from '@/lib/i18n';
 import { LEGAL } from '@/lib/legal';
+import { LEGAL_V2 } from '@/lib/legal-v2';
 import { OPERATOR } from '@/lib/operator';
 
 export async function generateMetadata() {
@@ -37,7 +38,8 @@ export default async function LegalPage() {
         </dl>
         <p className="legal-note">{L.note}</p>
 
-        {L.sections.map((s) => (
+        {/* the reviewed texts first, then the additions for v2 (lib/legal-v2.js) */}
+        {[...L.sections, LEGAL_V2[lang]].map((s) => (
           <section key={s.title}>
             <h2>{s.title}</h2>
             {s.paragraphs.map((p) => (
