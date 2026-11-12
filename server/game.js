@@ -93,6 +93,9 @@ export const _test = {
   },
 };
 
+/** text sent by a client, nothing else (an object would become "[object Object]") */
+const textOf = (v) => (typeof v === 'string' ? v : '');
+
 const safeEqual = (a, b) => {
   const x = Buffer.from(String(a));
   const y = Buffer.from(String(b));
@@ -973,6 +976,7 @@ function endUpload(room) {
   // right now stay in the game.
   const deal = dealSwap({ receivers: receivers.map((p) => p.id), owners: swapOwners(room), options: SWAP_OPTIONS, shuffle });
   for (const p of receivers) addToRound(room, p, swapHand(room, p, deal.get(p.id) || []));
+  for (const p of room.players.values()) p.swapResults = null;
   cur.endingSoon = false;
   beginCaption(room);
 }
@@ -1418,6 +1422,9 @@ function handleHello(ws, msg) {
   player.ipHash = ws.ipHash || null;
   player.restricted = Boolean(sanction);
   if (player.nameLocked && !account) player.name = player.lockedName || player.name;
+  // a socket holds one seat: a second hello for another room or player gives up the first one,
+  // otherwise that player would stay "connected" for ever
+  if (ws.player && ws.player !== player) releaseSeat(ws);
   player.sockets.add(ws);
   player.connected = true;
   player.disconnectedAt = 0;
@@ -1443,8 +1450,15 @@ function handleHello(ws, msg) {
 
 function handleClose(ws) {
   leaveQueue(ws);
+  releaseSeat(ws);
+}
+
+/** the socket no longer belongs to its player (connection closed, or it said hello for another seat) */
+function releaseSeat(ws) {
   const { room, player } = ws;
   if (!room || !player) return;
+  ws.room = null;
+  ws.player = null;
   player.sockets.delete(ws);
   if (player.sockets.size) return;
   player.connected = false;
@@ -1499,11 +1513,12 @@ function dropFromRound(room, pid) {
   if (room.phase === 'upload') dropContribution(room, pid);
 }
 
-function removePlayer(room, target, msg) {
+/** `msg` goes to every tab of the player (nothing when they left by themselves) */
+function removePlayer(room, target, msg = null) {
   room.players.delete(target.id);
   room.reserved.delete(target.id);
   for (const s of target.sockets) {
-    send(s, msg);
+    if (msg) send(s, msg);
     s.room = null;
     s.player = null;
   }
@@ -1727,7 +1742,7 @@ function handleMessage(ws, msg) {
       // (files the server itself cannot fetch are blocked globally by the proxy)
       if (room.phase !== 'caption' || !cur) return;
       const sub = cur.subs.get(player.id);
-      if (!sub || sub.submitted || sub.media?.id !== msg.id || sub.brokenSwaps >= BROKEN_MAX) return;
+      if (!sub || sub.submitted || !sub.media || sub.media.id !== msg.id || sub.brokenSwaps >= BROKEN_MAX) return;
       sub.brokenSwaps += 1;
       if (msg.noVideo && sub.media.kind === 'video') player.noVideo = true;
       if (isHunt(room) || isSwap(room)) {
@@ -1754,7 +1769,7 @@ function handleMessage(ws, msg) {
         return luckyHand(room, sub, player);
       }
       if (sub.searchesLeft <= 0) return send(ws, { t: 'error', code: 'no_searches_left' });
-      const q = cleanQuery(msg.q);
+      const q = cleanQuery(textOf(msg.q));
       if (q.length < QUERY_MIN) return send(ws, { t: 'error', code: 'search_short' });
       if (isBlocked(q)) return send(ws, { t: 'error', code: 'search_blocked' });
       // every attempt can be a provider call - also the ones without a hit
@@ -1784,7 +1799,7 @@ function handleMessage(ws, msg) {
     }
     case 'swap_search': {
       if (room.phase !== 'upload' || !cur || !isSwap(room)) return;
-      const q = cleanQuery(msg.q);
+      const q = cleanQuery(textOf(msg.q));
       if (q.length < QUERY_MIN) return send(ws, { t: 'error', code: 'search_short' });
       if (isBlocked(q)) return send(ws, { t: 'error', code: 'search_blocked' });
       const t = now();
@@ -1798,7 +1813,10 @@ function handleMessage(ws, msg) {
       search(q, { kind })
         .then((items) => {
           const list = (items || []).filter((i) => !isBroken(i.url)).slice(0, 30);
-          player.swapResults = new Map(list.map((i) => [i.id, i]));
+          // only while this bring phase runs - the list is dropped when it ends
+          if (room.current === cur && room.phase === 'upload' && room.players.get(player.id) === player) {
+            player.swapResults = new Map(list.map((i) => [i.id, i]));
+          }
           send(ws, { t: 'swap_results', q, items: list.map(tileMedia) });
         })
         .catch(() => send(ws, { t: 'swap_results', q, items: [] }));
@@ -1864,24 +1882,8 @@ function handleMessage(ws, msg) {
       if (!isHost(ws) || room.phase !== 'final') return;
       return backToLobby(room);
     case 'leave':
-      room.reserved.delete(player.id);
-      room.players.delete(player.id);
-      player.sockets.delete(ws);
-      ws.room = null;
-      ws.player = null;
-      dropFromRound(room, player.id);
-      if (!player.sockets.size) player.connected = false;
-      ensureHost(room);
-      if (!connectedPlayers(room).length) scheduleCleanup(room);
-      maybeEndCaptionEarly(room);
-      maybeRevealEarly(room);
-      maybeEndUploadEarly(room);
-      broadcast(room);
-      if (room.isPublic) {
-        checkPublicStart(room);
-        onPublicRoomChanged(room.settings.game);
-      }
-      return undefined;
+      // same cleanup as a kick; other tabs of this player are out too and can no longer vote unseen
+      return removePlayer(room, player);
     default:
       return undefined;
   }
@@ -1907,7 +1909,8 @@ export function attachGame(wss) {
       if (isBinary) return;
       let msg;
       try {
-        msg = JSON.parse(data.toString());
+        // objects with their own "toString"/"valueOf" would make every String(...) below throw
+        msg = JSON.parse(data.toString(), (key, value) => (key === 'toString' || key === 'valueOf' ? undefined : value));
       } catch {
         return;
       }
