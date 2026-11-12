@@ -9,6 +9,7 @@ import {
   gamesFor,
   isPaced,
   presetFor,
+  restoreHand,
   sanitizeSettings,
 } from '../lib/shared.js';
 
@@ -115,4 +116,32 @@ test('settings: searches per round', () => {
   const { searches, ...old } = hunt;
   assert.equal(searches, 0);
   assert.equal(sanitizeSettings({ rounds: 2 }, old).searches, 0);
+});
+
+test('restoreHand: the tray comes once per connection and is put back into later states', () => {
+  const hand = [{ id: '1' }, { id: '2' }];
+  let cache = null;
+  // first state with a tray: remembered
+  const first = { caption: { hand, handKey: '7:1.2', pickedId: '1' } };
+  cache = restoreHand(first, cache);
+  assert.deepEqual(cache, { key: '7:1.2', hand });
+  assert.equal(first.caption.hand, hand);
+  // later states come without it
+  const lean = { caption: { handKey: '7:1.2', pickedId: '2' } };
+  cache = restoreHand(lean, cache);
+  assert.equal(lean.caption.hand, hand);
+  // a key the connection never got a tray for: empty rather than a wrong tray
+  const stale = { caption: { handKey: '8:1.2' } };
+  cache = restoreHand(stale, cache);
+  assert.deepEqual(stale.caption.hand, []);
+  // modes without a tray always send the empty list and no key
+  const classic = { caption: { hand: [] } };
+  assert.equal(restoreHand(classic, cache), cache);
+  assert.deepEqual(classic.caption.hand, []);
+  // spectators and other phases are left alone
+  const spectator = { caption: { spectator: true } };
+  assert.equal(restoreHand(spectator, cache), cache);
+  assert.deepEqual(spectator, { caption: { spectator: true } });
+  assert.equal(restoreHand({ phase: 'vote' }, cache), cache);
+  assert.equal(restoreHand(null, null), null);
 });

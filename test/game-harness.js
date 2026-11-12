@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { mock } from 'node:test';
+import { restoreHand } from '../lib/shared.js';
 
 export const START = 1_800_000_000_000;
 
@@ -21,6 +22,8 @@ export class Client {
     this.name = name || `P${seq}`;
     this.account = account;
     this.state = null;
+    this.wire = null;
+    this.bytes = 0;
     this.msgs = [];
     this.ws = null;
   }
@@ -29,10 +32,16 @@ export class Client {
   open() {
     const ws = new EventEmitter();
     ws.readyState = 1;
+    // like the browser: the tray comes once per connection and is put back into later states
+    let tray = null;
     ws.send = (data) => {
       const msg = JSON.parse(data);
       this.msgs.push(msg);
-      if (msg.t === 'state') this.state = msg.state;
+      this.bytes += data.length;
+      if (msg.t !== 'state') return;
+      this.wire = JSON.parse(data).state; // exactly what was sent
+      tray = restoreHand(msg.state, tray);
+      this.state = msg.state;
     };
     ws.ping = () => {};
     ws.terminate = () => {};

@@ -74,6 +74,7 @@ const CROWD_MAX_PER_ITEM = 5; // reactions per reactor and meme that count for t
 const DIST_IN_CLASSIC = true; // show the anonymous vote distribution in classic too (presentation only)
 
 const rooms = new Map();
+let subSeq = 0; // numbers the entries of all rounds (see handKeyOf)
 
 const now = () => Date.now();
 const shuffle = (arr) => {
@@ -389,6 +390,12 @@ const thumbOf = (m) => (m.thumb ? (m.local ? m.thumb : proxyUrl(m.thumb)) : null
 /** media of a tile in a tray or a list: with a small preview */
 const tileMedia = (m) => ({ ...publicMedia(m), thumb: thumbOf(m) });
 
+/**
+ * Names the content of a tray. A tray can be large and changes rarely, so a
+ * connection gets it once and afterwards only this key (see sendState).
+ */
+const handKeyOf = (sub) => (sub.hand.length ? `${sub.uid}:${sub.hand.map((tile) => tile.id).join('.')}` : undefined);
+
 /** what a player is doing right now (shown in the player strip) */
 function stepOf(room, p) {
   const cur = room.current;
@@ -467,6 +474,7 @@ function stateFor(room, pid) {
           swapped: Boolean(mine.from && mine.from !== pid),
           // the tray: only its owner ever gets it, and never with the name of who brought a picture
           hand: mine.hand.map((tile) => ({ id: tile.id, q: isHunt(room) ? tile.q : null, media: tileMedia(tile.media) })),
+          handKey: handKeyOf(mine),
           pickedId: mine.pickedId,
           hunt: isHunt(room)
             ? {
@@ -548,8 +556,22 @@ function stateFor(room, pid) {
 
 function sendState(room, p) {
   if (!p?.sockets.size) return;
-  const msg = JSON.stringify({ t: 'state', state: stateFor(room, p.id) });
-  for (const ws of p.sockets) if (ws.readyState === 1) ws.send(msg);
+  const state = stateFor(room, p.id);
+  const key = state.caption?.handKey;
+  let full = null;
+  let lean = null;
+  for (const ws of p.sockets) {
+    if (ws.readyState !== 1) continue;
+    if (key && ws.handKey === key) {
+      // this connection already has the tray: the state goes out without it (restoreHand in lib/shared.js)
+      lean ||= JSON.stringify({ t: 'state', state: { ...state, caption: { ...state.caption, hand: undefined } } });
+      ws.send(lean);
+      continue;
+    }
+    full ||= JSON.stringify({ t: 'state', state });
+    ws.send(full);
+    if (key) ws.handKey = key;
+  }
 }
 
 function broadcast(room) {
@@ -646,7 +668,9 @@ function giveShared(room, sub) {
 
 /** `hand`: [{ media, from }] - pictures to choose from (swap round), the first one is preselected */
 function addToRound(room, player, hand = null) {
+  subSeq += 1;
   const sub = {
+    uid: subSeq,
     pid: player.id,
     media: null,
     captions: [],

@@ -178,7 +178,7 @@ test('hunt: leaving, kicking and a new host in the middle of a round', async () 
   assert.ok(ben.state.final.ranking.every((r) => here().some((p) => p.pid === r.pid)));
 });
 
-test('the state stays small: a full tray and sixteen players', async () => {
+test('the state stays small: a full tray is sent once per connection, sixteen players', async () => {
   env.search((q) => hits(q, 40));
   const { code, players, host } = await env.room(1, { game: 'hunt', settings: { maxPlayers: 16, searches: 4, rounds: 1 } });
   for (let i = 1; i < 16; i++) players.push(env.client({ name: `Player number ${i}` }).join(code));
@@ -190,17 +190,73 @@ test('the state stays small: a full tray and sixteen players', async () => {
     await flush();
   }
   host.send({ t: 'search', random: true });
-  host.send({ t: 'draft', captions: Array.from({ length: 6 }, (_, i) => ({ ...caption('x'.repeat(140))[0], y: i * 10 })) });
-  host.send({ t: 'pick', id: host.state.caption.hand[0].id });
   assert.equal(host.state.caption.hand.length, 20);
-  const own = JSON.stringify({ t: 'state', state: host.state }).length;
-  assert.ok(own < 24_000, `state of the player with the full tray: ${own} bytes`);
+  assert.equal(host.wire.caption.hand.length, 20, 'a changed tray is sent');
+  const hand = host.state.caption.hand;
+  const full = JSON.stringify(host.wire).length;
+  assert.ok(full < 16_000, `state with the full tray: ${full} bytes`);
+
+  // picking, typing and whatever the others do: the tray is not sent again, the browser still has it
+  host.send({ t: 'draft', captions: Array.from({ length: 6 }, (_, i) => ({ ...caption('x'.repeat(140))[0], y: i * 10 })) });
+  host.send({ t: 'pick', id: hand[5].id });
+  assert.equal(host.wire.caption.hand, undefined);
+  assert.equal(host.wire.caption.handKey, host.state.caption.handKey);
+  assert.equal(host.wire.caption.pickedId, hand[5].id);
+  assert.deepEqual(host.state.caption.hand, hand);
+  players[1].send({ t: 'search', q: 'somebody else' });
+  await flush();
+  assert.equal(host.wire.caption.hand, undefined);
+  assert.deepEqual(host.state.caption.hand, hand);
+  const lean = JSON.stringify(host.wire).length;
+  assert.ok(lean < 6500, `state without the tray: ${lean} bytes`);
+
+  // a second tab and a new connection get the whole tray again
+  const tab = env.client({ pid: host.pid });
+  tab.secret = host.secret;
+  tab.join(code);
+  assert.deepEqual(tab.wire.caption.hand, hand);
+  assert.equal(host.wire.caption.hand, undefined);
+  tab.drop();
+  host.drop();
+  await env.advance(1000);
+  host.join(code);
+  assert.deepEqual(host.wire.caption.hand, hand);
+  assert.equal(host.state.caption.pickedId, hand[5].id);
+
   // everybody else gets nothing of that tray
-  const other = JSON.stringify({ t: 'state', state: players[1].state });
+  const other = JSON.stringify(players[2].wire);
   assert.ok(other.length < 6000, `state of another player: ${other.length} bytes`);
   assert.equal(other.includes('a rather long search term'), false);
   // ... and is not told about searches and picks of a player who already had a GIF
-  const before = players[1].msgs.filter((m) => m.t === 'state').length;
-  host.send({ t: 'pick', id: host.state.caption.hand[5].id });
-  assert.equal(players[1].msgs.filter((m) => m.t === 'state').length, before);
+  const before = players[2].msgs.filter((m) => m.t === 'state').length;
+  host.send({ t: 'pick', id: hand[0].id });
+  assert.equal(players[2].msgs.filter((m) => m.t === 'state').length, before);
+
+  // a broken file changes the tray: it is sent again
+  host.send({ t: 'broken', id: host.state.caption.media.id });
+  assert.equal(host.wire.caption.hand.length, 20);
+  assert.notEqual(host.wire.caption.handKey, tab.wire.caption.handKey);
+});
+
+test('a tray of an earlier game is never shown again', async () => {
+  env.search((q) => hits(q, 40));
+  const { players, host } = await env.room(2, { game: 'hunt', settings: { rounds: 1 } });
+  const keys = new Set();
+  for (let game = 0; game < 2; game++) {
+    await env.start(host);
+    host.send({ t: 'search', q: `game ${game}` });
+    await flush();
+    // same round number, same tile numbers - but another tray
+    assert.equal(host.wire.caption.hand.length, 4);
+    assert.deepEqual(host.state.caption.hand.map((tile) => tile.id), ['1', '2', '3', '4']);
+    assert.ok(host.state.caption.hand.every((tile) => tile.q === `game ${game}`));
+    keys.add(host.state.caption.handKey);
+    players[1].send({ t: 'search', random: true });
+    for (const p of players) p.send({ t: 'submit', captions: caption('x') });
+    await env.advance(1500 + 2 * (12_000 + 3500) + 12_000);
+    assert.equal(host.state.phase, 'final');
+    host.send({ t: 'again' });
+    assert.equal(host.state.phase, 'lobby');
+  }
+  assert.equal(keys.size, 2);
 });
