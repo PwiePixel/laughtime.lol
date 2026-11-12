@@ -401,3 +401,19 @@ test('final: classic ranks by score only and keeps the shared first place', asyn
   assert.equal(shared.tie, true);
   assert.equal(shared.decidedBy, null);
 });
+
+test('final: rounds that end level count for both - a full tie stays a shared win', async () => {
+  const { players, host } = await env.room(2, { game: 'hunt', settings: { rounds: 2 } });
+  await env.start(host);
+  for (let round = 1; round <= 2; round++) {
+    for (const p of players) await ready(p);
+    await env.advance(1500);
+    await voteAll(players, () => 5);
+    await env.advance(12_000);
+  }
+  const final = host.state.final;
+  assert.deepEqual(final.ranking.map((r) => [r.rank, r.score, r.roundWins, r.bestMeme]), [[1, 10, 2, 5], [1, 10, 2, 5]]);
+  assert.equal(final.tie, true);
+  assert.equal(final.decidedBy, null);
+  assert.deepEqual(final.awards, []);
+});

@@ -263,7 +263,7 @@ const presentPlayers = (room) =>
 function tally(room, pid) {
   let t = room.tally.get(pid);
   if (!t) {
-    t = { rounds: 0, roundWins: 0, memes: 0, votes: 0, assist: 0 };
+    t = { rounds: 0, roundWins: 0, roundTops: 0, memes: 0, votes: 0, assist: 0 };
     room.tally.set(pid, t);
   }
   return t;
@@ -1194,6 +1194,9 @@ function endVote(room) {
   }
   if (top && top.points > 0) {
     tally(room, top.pid).roundWins += 1;
+    // For the ranking a round that ends level counts for everybody at its top - the order of
+    // equal results is arbitrary and must not decide a game.
+    for (const r of cur.results) if (r.points === top.points && r.avg === top.avg) tally(room, r.pid).roundTops += 1;
     const players = presentPlayers(room).length;
     if (top.userId) {
       top.galleryId = safely('save meme', () =>
@@ -1229,7 +1232,7 @@ function finishGame(room) {
   const all = [...room.players.values()];
   const rows = all
     .filter((p) => p.connected || p.score > 0)
-    .map((p) => ({ pid: p.id, score: p.score, roundWins: room.tally.get(p.id)?.roundWins || 0, bestMeme: bestMeme.get(p.id) || 0, joinedAt: p.joinedAt }));
+    .map((p) => ({ pid: p.id, score: p.score, roundWins: room.tally.get(p.id)?.roundTops || 0, bestMeme: bestMeme.get(p.id) || 0, joinedAt: p.joinedAt }));
   // classic ranks by score only; the other modes break a tie by rounds won, then by the best meme
   const { ranking, tie, decidedBy } = rankPlayers(rows, { tieBreak: paced(room) });
   const took = all
