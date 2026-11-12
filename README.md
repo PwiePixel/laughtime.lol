@@ -4,11 +4,29 @@ Mehrspieler-Meme-Partyspiel im Stil von „Make It Meme“ – mit Bildvorlagen 
 Alle Inhalte werden automatisch aus dem Internet gezogen, es muss nichts hochgeladen werden – eigene Bilder/GIFs sind aber möglich (Meme Studio, Tausch-Runde).
 
 - Next.js 16 (App Router, `page.jsx`), React 19, ein eigener Node-Server mit WebSocket
-- Nur 7 Abhängigkeiten: `next`, `react`, `react-dom`, `ws`, `lucide-react` (Icons), `gifenc` (GIF-Download), `@discord/embedded-app-sdk` (Discord-Activity)
+- Nur 8 Abhängigkeiten: `next`, `react`, `react-dom`, `ws`, `sharp` (Bildvarianten), `lucide-react` (Icons), `gifenc` (GIF-Download), `@discord/embedded-app-sdk` (Discord-Activity)
 - Konten, Bestenlisten und Meme-Galerie mit der **in Node.js eingebauten SQLite-Datenbank** (`node:sqlite`) – kein Datenbankserver, nichts zu kompilieren. Datei: `data/laughtime.db`
 - Laufende Räume leben im Arbeitsspeicher
 - Englisch als Hauptsprache, Deutsch per Umschalter (EN | DE oben rechts)
-- **`index.js` im Hauptordner startet alles** (installieren → bauen → Server starten)
+- **`install.sh` richtet einen Server mit einem Befehl ein** (Pakete, Node.js, Build, Dienst, Cloudflare Tunnel); **`index.js` startet alles** (installieren → bauen → Server starten) und reicht für Pterodactyl weiterhin allein
+
+---
+
+## Neu in LaughTime v2
+
+| Bereich | Was sich getan hat | Details |
+| --- | --- | --- |
+| **Tempo** | Bilder in passender Größe als AVIF/WebP, Vorladen, Browser- und Server-Caches, schlankere Seiten | [Server](docs/performance-server.md) · [Browser](docs/performance-frontend.md) |
+| **API-Schutz** | Such-Cache, geteilte Anfragen, Warteschlange und Stundenbudget pro Quelle, automatisches Zurückhalten bei HTTP 429 – auch für Discord | [docs/performance-server.md](docs/performance-server.md) |
+| **Design** | Gleicher Look, mehr Feinschliff: flüssige Animationen, Glas und Glow, klares Feedback bei jedem Klick | [docs/design.md](docs/design.md) |
+| **App fürs Handy** | Installierbar (PWA), Hochformat, Offline-Hinweis, Bildschirm bleibt im Spiel an | [docs/pwa.md](docs/pwa.md) |
+| **Spielmodi** | Klassisch bleibt Klassisch; GIF-Jagd und Tausch-Runde neu aufgebaut; neuer Modus in der Beta | [So läuft ein Spiel](#so-läuft-ein-spiel) |
+| **Discord** | Activity für Desktop und Handy überarbeitet, zentrale Discord-Anbindung, optionale Webhooks | [Discord-Activity](#laughtime-als-discord-activity) |
+| **Eine Instanz** | Hauptseite und Beta laufen über dasselbe System (`/beta`, `beta.laughtime.lol`) | [docs/beta.md](docs/beta.md) |
+| **News** | Neuigkeiten und Changelog direkt auf der Seite (`/news`) | [docs/news.md](docs/news.md) |
+| **Server-Setup** | `bash install.sh` inklusive Cloudflare Tunnel | [docs/installation.md](docs/installation.md) |
+
+Alle neuen Einstellungen sind optional und stehen am Ende der `.env.example`. Eine bestehende `.env` aus v1 funktioniert unverändert weiter.
 
 ---
 
@@ -116,31 +134,63 @@ Benutzernamen in `ADMIN_USERNAMES` sehen im Konto-Menü den Punkt **Admin** (mit
 
 ## LaughTime als Discord-Activity
 
-LaughTime läuft zusätzlich **direkt in Discord** – im Sprachkanal über das Raketen-Symbol (Activities/App Launcher). Es ist dieselbe App wie die Website, mit angepasster Oberfläche.
+LaughTime läuft zusätzlich **direkt in Discord** – im Sprachkanal über das Raketen-Symbol (Activities/App Launcher). Es ist dieselbe App wie die Website, mit angepasster Oberfläche. Die Website selbst lädt nichts davon: Der Activity-Code und Discords SDK stecken in eigenen Paketen, die nur im Discord-Fenster nachgeladen werden.
 
 **So funktioniert es**
 
-- **Ein Raum pro Call:** Alle im selben Sprachkanal, die LaughTime starten, landen automatisch im selben Raum (Discord-`instanceId`). Wer zuerst startet, ist Host. Kein Code, kein Link. Die Räume sind privat: Über die Website kann man ihnen nicht beitreten, auch nicht mit dem Code.
-- **Automatische Anmeldung mit Discord:** Beim ersten Start fragt Discord einmal nach der Erlaubnis. Das Discord-Konto wird mit LaughTime verknüpft – wer sich auf der Website schon mit Discord angemeldet hat, spielt mit demselben Konto (Punkte, Profil, Bestenliste, Banns/Sperren gelten genauso). Neue Spieler bekommen automatisch ein Konto.
-- **Alle Spielmodi** (Klassisch, GIF-Jagd, Tausch-Runde mit Uploads) und alle Einstellungen wie im privaten Raum.
-- **„Freunde einladen“** öffnet Discords Einladungsdialog. Der Download-Knopf an Memes wird zu **„In Discord teilen“** (Discords Teilen-Dialog für Kanal/DM).
-- **Rich Presence:** Im Discord-Profil der Spieler steht, was gerade läuft (z. B. „Runde 2 von 5“, Spielmodus und Spielerzahl).
-- **Beste Memes, Bestenliste und Profile direkt in Discord:** Oben ist dieselbe Kopfzeile wie auf der Website (nur eine). „Spielen“, „Beste Memes“, „Bestenliste“ und „Mein Profil“ öffnen sich in der Activity; das Spiel läuft im Hintergrund weiter. Ein gelber Balken zeigt die laufende Runde mit „Zurück zum Spiel“, und sobald eine Runde startet oder abgestimmt wird, springt die Activity automatisch zurück ins Spiel. Nur Seiten, die es in Discord nicht gibt (Einstellungen, Studio, Admin, Impressum), öffnen sich nach Nachfrage im Browser. Abmelden gibt es in Discord nicht – dort ist das Discord-Konto der Login.
-- Sprache kommt aus den Discord-Einstellungen (Deutsch/Englisch), umschaltbar oben rechts. Handy-Safe-Areas und Bild-im-Bild werden berücksichtigt.
-- Das Admin-Dashboard zählt Discord-Räume und gestartete Activities mit.
+- **Ein Raum pro Call:** Alle im selben Sprachkanal, die LaughTime starten, landen automatisch im selben Raum (Discord-`instanceId`). Wer zuerst startet, ist Host. Kein Code, kein Link. Die Räume sind privat.
+- **Automatische Anmeldung mit Discord:** Beim ersten Start fragt Discord einmal nach der Erlaubnis (nur `identify` und `rpc.activities.write` – beides ohne Freigabe durch Discord). Das Discord-Konto ist mit dem LaughTime-Konto verknüpft; Punkte, Profil, Banns und Sperren gelten genauso wie auf der Website.
+- **Start in drei Schritten:** „Discord → Anmeldung → Raum“ wird sichtbar angezeigt. Jeder Schritt hat eine Zeitgrenze und wird bei vorübergehenden Fehlern automatisch wiederholt (1 s, 2 s, 4 s). Klappt es nicht, erscheint ein Fehlerbild mit Klartext, Fehlercode, „Nochmal versuchen“ (kurz gesperrt, damit niemand hämmert) und „Activity schließen“.
+- **Neu laden ohne neue Anmeldung:** Lädt Discord das Fenster neu oder reißt die Verbindung ab, landet der Spieler wieder im selben Raum – ohne neue Rückfrage. Die Anmeldung liegt dafür im `sessionStorage` des Activity-Fensters und endet mit dem Discord-Fenster.
+- **Bild-im-Bild:** Zeigt Discord die Activity nur als kleine Kachel, gibt es statt des gequetschten Spiels eine kompakte Ansicht: Phase, Runde, Restzeit, Spielerzahl und „Öffnen zum Spielen“ bzw. „Du bist dran“. Das Spiel läuft dahinter weiter.
+- **Handy (iOS/Android):** Auf Telefonen wird das Hochformat festgehalten – ein Textspiel braucht die Tastatur, im Querformat bliebe kein Platz fürs Meme. Tablets bleiben frei drehbar. Safe-Areas werden beachtet, das Textfeld rutscht über die Bildschirmtastatur, Knöpfe sind mindestens 44 px groß, die Kopfzeile passt in eine Zeile.
+- **Wer ist schon da?** Über dem Spiel steht, wer aus dem Call LaughTime gerade offen hat (Namen und Bilder kommen direkt aus Discord und bleiben im Fenster).
+- **„Freunde einladen“** öffnet Discords Einladungsdialog; wo der nicht geht (z. B. DMs), den „Link teilen“-Dialog. Der Download-Knopf an Memes wird zu **„In Discord teilen“**.
+- **Rich Presence:** Im Discord-Profil steht, was gerade läuft („Runde 2 von 5“, Spielmodus, Spielerzahl). Die Updates sind gedrosselt: nie zweimal dasselbe, höchstens eines alle 5 Sekunden.
+- **Beste Memes, Bestenliste und Profile** öffnen sich in der Activity, alles andere nach Nachfrage im Browser. Kann ein älterer Discord-Client keine Links öffnen, wird die Adresse zum Abtippen angezeigt.
+- **Ältere Discord-Clients:** Alle optionalen Funktionen (Sprache, Teilnehmer, Layout, Hochformat, Einladen, Teilen) haben eine Zeitgrenze und einen Ersatz – fehlt eine, startet das Spiel trotzdem.
 
 **Einrichten im Discord Developer Portal** (dieselbe App wie der Discord-Login, also dieselbe `DISCORD_CLIENT_ID`/`DISCORD_CLIENT_SECRET`):
 
 1. **OAuth2 → Redirects:** Der Website-Callback (`https://laughtime.lol/api/auth/discord/callback`) bleibt drin – Discord verlangt mindestens eine Redirect-URL, für die Activity selbst wird keine weitere gebraucht.
 2. **Installation → Installation Contexts:** „User Install“ und „Guild Install“ anhaken.
-3. **Activities → URL Mappings:** Root Mapping `PREFIX` = `/`, `TARGET` = `laughtime.lol` (für die Beta `beta.laughtime.lol`) – **ohne** `https://`. Weitere Mappings sind nicht nötig, alle Bilder und Clips laufen schon über unseren eigenen Medien-Proxy.
-4. **Activities → Settings:** „Enable Activities“ einschalten, gewünschte Plattformen (Desktop/Web, iOS, Android) wählen. Dabei legt Discord automatisch den Start-Befehl (Entry Point Command) an.
-5. **Optional, empfohlen – Bot → Token:** Token als `DISCORD_BOT_TOKEN` in die `.env`. Dann prüft der Server bei jedem Beitritt über Discords API, ob die Activity-Sitzung echt ist und der Spieler wirklich darin ist.
+3. **Activities → URL Mappings:** Root Mapping `PREFIX` = `/`, `TARGET` = `laughtime.lol` – **ohne** `https://`. Weitere Mappings sind nicht nötig: Alle Bilder und Clips laufen über unseren Medien-Proxy, Profilbilder der Teilnehmer kommen von Discords eigenem CDN.
+   - **Beta:** Hauptseite und Beta laufen seit v2 in **einer** Instanz. Die Beta braucht deshalb kein eigenes Mapping-Ziel und keine zweite Discord-App mehr. In Discord entscheidet allein der Host des Mappings über den Kanal (das Beta-Cookie der Website zählt im Discord-Fenster nicht): Mit `laughtime.lol` läuft die Activity im stabilen Kanal. Wer Beta-Funktionen in Discord ausprobieren will, stellt das Ziel vorübergehend auf `beta.laughtime.lol` – gleicher Server, gleiche App, gleiche Konten.
+4. **Activities → Settings:** „Enable Activities“ einschalten, Plattformen (Desktop/Web, iOS, Android) wählen. Discord legt dabei den Start-Befehl (Entry Point Command) an. Die Ausrichtung kann auf „unlocked“ bleiben – die Activity stellt sie auf Telefonen selbst ein.
+5. **Optional, empfohlen – Bot → Token:** Token als `DISCORD_BOT_TOKEN` in die `.env`. Dann prüft der Server bei jedem Beitritt, ob die Activity-Sitzung echt ist und der Spieler wirklich darin ist. Die Antworten werden 30 Sekunden gemerkt, gleichzeitige Anfragen zusammengelegt.
 6. Server neu starten. Kein neuer Build-Schritt nötig.
 
-**Wer kann es starten?** Solange die App nicht von Discord verifiziert und für „Discovery“ freigeschaltet ist, können nur du, Mitglieder deines Developer-Teams und eingeladene App-Tester (Portal → App Testers) die Activity starten – und nur in Servern mit weniger als 25 Mitgliedern. Für alle Discord-Nutzer: **App Verification** abschließen und unter **Discovery** freischalten (danach kann es bis zu 30 Stunden dauern, bis LaughTime im App Launcher auftaucht).
+**„Auf Discord spielen“:** `/activity` im normalen Browser erklärt, wie man die Activity startet, und bietet „Auf Discord spielen“ (öffnet `https://discord.com/activities/<Client-ID>`) sowie „Im Browser spielen“ an. Der Knopf ist eine eigene Komponente (`components/PlayOnDiscord.jsx`) und zeigt sich nur, wenn die Activity eingeschaltet ist (`/api/activity/config`).
 
-**Technik:** Discord lädt `https://<client-id>.discordsays.com/?frame_id=…&instance_id=…` über seinen Proxy. Die Startseite erkennt `frame_id`/`instance_id` und zeigt dann direkt die Activity (dieselbe Ansicht gibt es auch unter `/activity`). Nur diese beiden dürfen von Discord eingebettet werden (`frame-ancestors`), alle anderen Seiten bleiben mit `X-Frame-Options: SAMEORIGIN` geschützt. Weil Drittanbieter-Cookies im Discord-Fenster unzuverlässig sind, schickt die Activity ihre Sitzung als `Authorization: Bearer …` bzw. als WebSocket-Subprotokoll; diese Sitzungen laufen nach 2 Tagen ab. Der Discord-Proxy versteckt die IP-Adressen der Spieler – Anfragen aus der Activity werden deshalb nie per IP gesperrt oder gezählt, sondern immer über das Konto. WebSockets müssen wie bei der Website über HTTPS erreichbar sein (siehe „Domain laughtime.lol (Reverse-Proxy)“).
+**Wer kann es starten?** Solange die App nicht von Discord verifiziert und für „Discovery“ freigeschaltet ist, können nur du, dein Developer-Team und eingeladene App-Tester die Activity starten – und nur in Servern mit weniger als 25 Mitgliedern.
+
+**Technik:** Discord lädt `https://<client-id>.discordsays.com/?frame_id=…&instance_id=…` über seinen Proxy. Nur diese Adresse und `/activity` dürfen von Discord eingebettet werden (`frame-ancestors`); jede andere Adresse – auch mit angehängtem `frame_id` – bleibt gesperrt. Die Sitzung reist als `Authorization: Bearer …` bzw. als WebSocket-Subprotokoll und läuft nach 2 Tagen ab. Alle Server-Anfragen an Discord (Anmeldung, Profil, Sitzungsprüfung, Webhooks) gehen über `server/discord.js`: eine Warteschlange pro Host, Pause bei HTTP 429 (`Retry-After`), Wiederholungen nur für lesende Anfragen – ein Anmelde-Code wird nie zweimal geschickt.
+
+**Lokal testen:** `DISCORD_API_URL` zeigt auf eine nachgebaute Discord-API, `ACTIVITY_DEV_FRAME=http://localhost:3333` erlaubt einer lokalen Testseite, `/activity` einzubetten (das SDK akzeptiert genau diese Adresse als Discord). `npm test` prüft Anmeldung, 429-Verhalten, Sitzungs-Cache, Webhooks und die Presence-Drossel gegen eine solche Attrappe.
+
+### Discord-Webhooks (optional)
+
+Beide sind aus, solange die Variable leer ist. Erlaubt sind nur echte Discord-Webhook-Adressen (`https://discord.com/api/webhooks/…`, auch `ptb.`/`canary.` und `discordapp.com`); alles andere wird ignoriert und einmal in der Konsole gemeldet. Die Adresse ist ein Geheimnis und wird nie ausgegeben. Ist Discord nicht erreichbar, passiert nichts weiter (eine Zeile im Log).
+
+| Variable | Wofür |
+|---|---|
+| `DISCORD_WEBHOOK_URL` | Ankündigungen im Community-Kanal, z. B. nach einem Update |
+| `DISCORD_MOD_WEBHOOK_URL` | Hinweis für die Moderatoren bei neuen Meldungen und Pack-Prüfungen |
+| `DISCORD_WEBHOOK_LANG` | Sprache des Moderatoren-Hinweises (`en` oder `de`, Standard `en`) |
+
+**Ankündigen** – der Server selbst schreibt beim Start nie etwas (eine Neustart-Schleife würde den Kanal fluten). Dafür gibt es ein Skript, das der Installer nach einem erfolgreichen Update aufruft:
+
+```bash
+node scripts/announce.mjs "LaughTime v2 ist da" "Neue Spielmodi!\nViel Spaß."
+node scripts/announce.mjs "Titel" "Text" --url=https://laughtime.lol/news
+```
+
+- liest die `.env` wie `index.js` (echte Umgebungsvariablen gewinnen)
+- dieselbe Ankündigung innerhalb von 10 Minuten wird übersprungen (`--force` schickt sie trotzdem)
+- `--dry-run` prüft nur die Einstellungen, `--strict` beendet sich mit Fehlercode 1, wenn die Nachricht nicht ankam (sonst immer 0, damit ein Update nicht daran scheitert)
+- `--mod-test` schickt eine Testnachricht an den Moderatoren-Kanal
+
+**Moderatoren-Hinweis:** höchstens eine Nachricht pro Minute. Sie enthält nur Zahlen („3 neue Meldungen (2× Beleidigung, 1× Spam)“, „1 Pack wartet auf eine Prüfung“) und den Link zu `/admin` – keine Namen, keine Inhalte, keine Kommentare.
 
 ---
 
@@ -168,6 +218,20 @@ Vorteile: Die IP-Adressen der Spieler gehen nicht an Dritte (DSGVO), keine Hotli
 Dateien, die nicht geladen werden können, werden automatisch ausgetauscht.
 
 Den Zustand aller Quellen sieht man unter **`/api/status`**.
+
+---
+
+## Installation auf einem eigenen Server (`install.sh`)
+
+```bash
+git clone https://github.com/PwiePixel/laughtime.lol.git
+cd laughtime.lol
+bash install.sh
+```
+
+Das Skript prüft das System, installiert fehlende Pakete und Node.js, legt bei Bedarf eine `.env` aus der Vorlage an (**eine vorhandene `.env` wird nie verändert**), baut die App, richtet einen Dienst mit automatischem Neustart ein (systemd, sonst PM2) und stellt die Seite über einen Cloudflare Tunnel unter `laughtime.lol`, `www.laughtime.lol` und `beta.laughtime.lol` online. Für die Freigabe der Domain zeigt es den Autorisierungs-Link von Cloudflare im Terminal an. Am Ende steht eine Statusübersicht; ist `DISCORD_WEBHOOK_URL` gesetzt, geht eine Meldung an den Discord-Kanal.
+
+Erst ansehen, was passieren würde: `bash install.sh --dry-run`. Aktualisieren: `bash install.sh --update`. Alle Optionen, die einzelnen Schritte und Hilfe bei Problemen: **[docs/installation.md](docs/installation.md)**.
 
 ---
 
@@ -265,15 +329,43 @@ Zum Testen allein: `MIN_PLAYERS=1` in der `.env` (für das schnelle Spiel `MATCH
 | `TRUST_PROXY` | true | Besucher-IP aus `X-Forwarded-For` lesen (nur hinter Nginx/Cloudflare auf `true`) |
 | `COOKIE_SECURE` | false | Secure-Flag für Cookies erzwingen (hinter HTTPS-Proxy wird es automatisch erkannt) |
 
+Neu in v2 (alle optional, Standardwerte im Code):
+
+| Variable | Standard | Bedeutung |
+|---|---|---|
+| `BETA_ENABLED` | true | Beta-Kanal an/aus |
+| `BETA_HOSTS` | `beta.<Host aus PUBLIC_URL>` | Hosts, die immer die Beta zeigen |
+| `BETA_ACCESS` | open | wer der Beta beitreten darf: `open`, `accounts`, `admins` |
+| `BETA_FEEDBACK_URL` | – | Feedback-Link auf der Beta-Seite |
+| `FEATURE_FLAGS` | – | einzelne Funktionen freischalten/abschalten, z. B. `liveStatus=stable` |
+| `GIPHY_HOURLY_LIMIT`, `KLIPY_HOURLY_LIMIT` | 90 | höchstens so viele API-Anfragen pro Stunde (0 = unbegrenzt; mit Produktionsschlüssel erhöhen) |
+| `IMGFLIP_HOURLY_LIMIT` | 600 | Seitenabrufe pro Stunde bei imgflip.com |
+| `SEARCH_CACHE_MINUTES`, `SEARCH_CACHE_ENTRIES` | 15 / 500 | wie lange und wie viele Suchergebnisse im Speicher bleiben |
+| `IMAGE_VARIANTS` | true | verkleinerte AVIF/WebP-Varianten im Medien-Proxy |
+| `IMAGE_AVIF` | true | AVIF für kleine Bilder (false = nur WebP, spart CPU) |
+| `IMAGE_WORKERS` | 2 | gleichzeitige Bildumwandlungen (1–8) |
+| `WS_COMPRESSION` | false | WebSocket-Nachrichten komprimieren |
+| `DISCORD_WEBHOOK_URL` | – | Webhook für Ankündigungen (`install.sh`, `node scripts/announce.mjs "Titel" "Text"`) |
+| `DISCORD_MOD_WEBHOOK_URL` | – | Webhook für Moderations-Hinweise (nur Anzahl und Kategorie, keine Namen) |
+| `DISCORD_WEBHOOK_LANG` | en | Sprache der Moderations-Hinweise (`en`/`de`) |
+
 ---
 
 ## Ordnerstruktur
 
 ```
-index.js                 Startdatei für Pterodactyl
+index.js                 Startdatei (auch für Pterodactyl); --build-only baut nur
+install.sh               Server-Setup mit einem Befehl (Pakete, Node.js, Dienst, Cloudflare Tunnel)
+deploy/                  Vorlagen: systemd-Units, cloudflared- und Nginx-Beispiel
+docs/                    ausführliche Kapitel zu v2 (Installation, Performance, Design, PWA, Beta, News)
+scripts/                 announce.mjs (Discord-Ankündigung), generate-icons.mjs, optimize-assets.mjs
+test/                    automatische Tests (npm test)
 server/
   server.js              HTTP-Server: Next.js + WebSocket + API
   api.js                 REST-API: Login, Discord, Profil, Bestenliste, Galerie, Likes, Studio/Packs, Admin
+  channel.js, beta.js    Kanal einer Anfrage (stable/beta), Beta-API, Login-Übergabe an den Beta-Host
+  discord.js             zentrale Discord-Anbindung (OAuth, Activity-Prüfung) mit Rate-Limit-Schutz
+  webhook.js             optionale Discord-Webhooks (Ankündigungen, Moderations-Hinweise)
   moderation.js          Meldungen, Banns/Sperren, Admin-Protokoll, Statistik fürs Dashboard
   activity.js            Discord-Activity: Anmeldung per Discord, ein Raum pro Call
   matchmaking.js         Schnelles Spiel: Warteschlangen, Matches, öffentliche Räume
@@ -284,15 +376,20 @@ server/
   stats.js               Spielergebnisse, Bestenlisten, Meme-Galerie
   db.js                  SQLite-Datenbank (node:sqlite)
   http.js                kleine HTTP-Helfer (Cookies, Rate-Limits)
-  game.js                Spiellogik (Räume, Runden, Abstimmung, Punkte)
-  proxy.js               Medien-Proxy mit Festplatten-Cache
+  game.js, game/         Spiellogik (Räume, Runden, Abstimmung, Punkte) und die Regeln der Modi
+  proxy.js               Medien-Proxy mit Festplatten-Cache und Bildvarianten (AVIF/WebP)
   config.js              liest die .env
-  media/                 Quellen: imgflip.js, giphy.js, klipy.js, reddit.js, index.js (Vorrat),
+  lib/                   outbound.js (Cache, Warteschlange, 429-Schutz für externe APIs),
+                         respond.js (Micro-Cache, ETag, Kompression), work.js, sharp.js
+  media/                 Quellen: imgflip.js, giphy.js, klipy.js, reddit.js, pool.js/index.js (Vorrat),
                          search.js (Freitext-Suche für GIF-Jagd und Studio)
 app/
-  layout.jsx             Grundgerüst, Sprache, Schriften
+  layout.jsx             Grundgerüst, Sprache, Schriften, Kanal (stable/beta)
   page.jsx               Startseite (Schnelles Spiel / Privates Spiel)
   play/page.jsx          Matchmaking mit Ladebildschirm
+  news/                  News & Changelog
+  beta/page.jsx          Beta-Seite (beitreten / verlassen)
+  install/, offline/     „App holen“ und Offline-Seite der Web-App
   studio/page.jsx        Meme Studio
   activity/page.jsx      Discord-Activity (auch „/“ mit frame_id, so öffnet Discord sie)
   admin/page.jsx         Admin-Bereich: Übersicht, Meldungen, Spieler, Sperren, Pack-Freigabe, Protokoll
@@ -309,14 +406,20 @@ app/
   globals.css            Design (Spiel)
   community.css          Design (Navigation, Konten, Bestenliste, Galerie)
   modes.css              Design (Spielauswahl, Matchmaking, GIF-Jagd, Studio)
+  v2.css                 v2: Tokens und Hilfsklassen (Bewegung, Glas, Glow) – oben dokumentiert
+  modes-v2.css, news.css, pwa.css, beta.css, activity.css, media.css   v2-Bereiche
   icon.svg, apple-icon.png
   fonts/                 Fredoka + Anton (lokal, SIL OFL)
 components/              Lobby, Schreibphase, Abstimmung, Rangliste, Finale, Meme-Anzeige,
                          Melden (ReportDialog), Sperrhinweis (SanctionGate) …
   admin/                 Dashboard + Diagramme (Charts.jsx), Meldungen, Spieler, Sperren, Protokoll
-lib/                     Übersetzungen (i18n.js), Betreiber (operator.js), Rechtstexte (legal.js),
-                         gemeinsame Regeln, WebSocket-Hook, Download
-public/                  Logo (logo.svg, logo-mark.svg/.png, logo.png), Banner (banner.png)
+  game/                  Bausteine der Spielansichten (v2)
+  news/, beta/, pwa/, ui/, v2/   News, Beta-Seite, Web-App, Dialog-Helfer, v2-Einstiegspunkte
+lib/                     Übersetzungen (i18n.js + locales/), Betreiber (operator.js), Rechtstexte
+                         (legal.js, Ergänzungen in legal-v2.js), gemeinsame Regeln (shared.js),
+                         Kanäle & Feature-Schalter (features.js), News-Inhalte (news.js),
+                         Browser-Cache (fetchCache.js), Bildvarianten (media.js), WebSocket-Hook, Download
+public/                  Logo, Banner, manifest.json, sw.js (Service Worker), icons/, screenshots/
 ```
 
 ## Logo & Banner
@@ -331,6 +434,6 @@ Auf der Startseite ist das Logo als animiertes SVG eingebaut (`components/LolLog
 ## Rechtliches
 
 - Plattform: **LaughTime**, Betreiber: **OnYourSite** (Phoenix, Arizona, USA, contact@on-your.site). Die Angaben stehen zentral in `lib/operator.js` und erscheinen auf `/legal`.
-- Die Texte für Impressum, Haftungsausschluss und Datenschutz (Englisch + Deutsch) liegen in `lib/legal.js`. Sie beschreiben, was die App tatsächlich macht (kein Tracking, ein Sprach-Cookie, Medien über den eigenen Server). Bitte trotzdem von jemandem prüfen lassen, der sich damit auskennt.
+- Die Texte für Impressum, Haftungsausschluss und Datenschutz (Englisch + Deutsch) liegen in `lib/legal.js`. Die Ergänzungen zu v2 (Web-App/Offline-Speicher, Beta-Cookie, Cloudflare, Discord) stehen getrennt in `lib/legal-v2.js` und erscheinen auf `/legal` als eigener Abschnitt unter dem bestehenden Text – `lib/legal.js` selbst ist unverändert. Sie beschreiben, was die App tatsächlich macht (kein Tracking, ein Sprach-Cookie, Medien über den eigenen Server). Bitte trotzdem von jemandem prüfen lassen, der sich damit auskennt.
 - Meme-Vorlagen und Clips gehören ihren Rechteinhabern. Die Nutzungsbedingungen von GIPHY, KLIPY und Reddit gelten.
 - Schriften: Fredoka und Anton unter SIL Open Font License (`app/fonts/OFL.txt`). Icons: Lucide (ISC-Lizenz).
