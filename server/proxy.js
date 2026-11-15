@@ -25,7 +25,8 @@ import { markBroken } from './media/index.js';
 const ALLOWED_HOSTS = [
   /^i\.imgflip\.com$/,
   /^(media\d*|i)\.giphy\.com$/,
-  /^[a-z0-9-]+\.klipy\.com$/,
+  // file hosts only: the API host must never be reachable through the proxy
+  /^(?!api\.)[a-z0-9-]+\.klipy\.com$/,
   /^v\.redd\.it$/,
   /^i\.redd\.it$/,
   /^(preview|external-preview)\.redd\.it$/,
@@ -74,8 +75,9 @@ function touch(file) {
 async function download(url) {
   const key = keyOf(url);
   const f = files(key);
-  // one retry, 45 s for everything: a player is waiting for this file
-  const request = { timeout: 30000, retries: 1, deadlineMs: 45000, headers: { Referer: '' } };
+  // one retry, 45 s for everything: a player is waiting for this file.
+  // budget: false – a download never uses up the hourly budget of an API
+  const request = { timeout: 30000, retries: 1, deadlineMs: 45000, budget: false, headers: { Referer: '' } };
   let res = await fetchWithTimeout(url, request);
   // Imgflip search/template pages only show .jpg thumbnails – some originals are .png (and vice versa)
   const alt = res.status === 404 && /^https:\/\/i\.imgflip\.com\/[a-z0-9]+\.(jpg|png)$/i.test(url)

@@ -129,10 +129,11 @@ export function dedupe(key, fn) {
 
 // how hard we may hit a host: parallel requests and the minimum gap between two starts
 const HOST_RULES = [
-  // file servers of the media sources: no API limits, only keep the parallelism sane
-  { test: /^(media\d*|i)\.giphy\.com$/, concurrency: 6, minGapMs: 0 },
+  // file servers of the media sources: no API limits, only keep the parallelism sane.
+  // `group`: many host names, one line in the public numbers
+  { test: /^(media\d*|i)\.giphy\.com$/, concurrency: 6, minGapMs: 0, group: 'giphy.com (files)' },
   { test: /^i\.imgflip\.com$/, concurrency: 6, minGapMs: 0 },
-  { test: /^(?!api\.)[a-z0-9-]+\.klipy\.com$/, concurrency: 6, minGapMs: 0 },
+  { test: /^(?!api\.)[a-z0-9-]+\.klipy\.com$/, concurrency: 6, minGapMs: 0, group: 'klipy.com (files)' },
   { test: /(^|\.)discord(app)?\.com$/, concurrency: 4, minGapMs: 40 },
   { test: /(^|\.)giphy\.com$/, concurrency: 2, minGapMs: 120 },
   { test: /(^|\.)klipy\.com$/, concurrency: 2, minGapMs: 250 },
@@ -142,6 +143,9 @@ const HOST_RULES = [
 ];
 const DEFAULT_RULE = { concurrency: 6, minGapMs: 0 };
 const MAX_QUEUE = 400;
+// Host names can come from outside (the media proxy takes any file host of a
+// source), so the table must not grow for ever: idle hosts are forgotten.
+const MAX_HOSTS = 200;
 const MAX_WAIT_MS = 30_000;
 const HOUR_MS = 60 * 60 * 1000;
 // longest pause we accept: when the API names a time itself / when we have to guess
@@ -150,14 +154,34 @@ const MAX_GUESSED_PAUSE_MS = 120_000;
 
 const hosts = new Map(); // host -> state
 
+/** nothing running, nothing waiting and nothing to remember (budget, pause) */
+const isIdle = (s) => !s.pending && !s.active && !s.queue.length && !s.timer && !s.perHour && s.pausedUntil <= now();
+
+function forgetIdleHosts() {
+  // the Map is in "last used" order: the longest unused hosts go first
+  for (const s of hosts.values()) {
+    if (hosts.size <= MAX_HOSTS * 0.75) break;
+    if (isIdle(s)) hosts.delete(s.host);
+  }
+}
+
 function hostState(host) {
   let state = hosts.get(host);
-  if (!state) {
+  if (state) {
+    hosts.delete(host);
+    hosts.set(host, state);
+  } else {
+    if (hosts.size >= MAX_HOSTS) forgetIdleHosts();
     const rule = HOST_RULES.find((r) => r.test.test(host)) || DEFAULT_RULE;
     state = {
       host,
+      // named: a host of a service we know; group: shares one line in the public numbers
+      named: rule !== DEFAULT_RULE,
+      group: rule.group || '',
       concurrency: rule.concurrency,
       minGapMs: rule.minGapMs,
+      // calls of outboundFetch() that are not finished yet (waiting between two attempts included)
+      pending: 0,
       active: 0,
       queue: [],
       lastStart: 0,
@@ -319,14 +343,25 @@ export function retryAfterMs(headers) {
  *               that is paused for longer fails at once with code 'host_paused'
  *   deadlineMs  upper limit for everything together (queue, attempts, pauses)
  *   priority    'low' leaves the reserved part of an hourly budget untouched
+ *   budget      false: the request does not count against an hourly budget
+ *               (file downloads – the budgets are for API calls)
  * Errors carry a code: 'budget_exhausted', 'host_paused', 'queue_full', 'queue_timeout'.
  */
 export async function outboundFetch(
   url,
-  { timeout = 12_000, retries = 2, maxWaitMs = 8_000, maxQueueMs = MAX_WAIT_MS, deadlineMs = Infinity, priority = 'normal', ...init } = {},
+  { timeout = 12_000, retries = 2, maxWaitMs = 8_000, maxQueueMs = MAX_WAIT_MS, deadlineMs = Infinity, priority = 'normal', budget = true, ...init } = {},
 ) {
   const target = new URL(String(url));
   const state = hostState(target.host.toLowerCase());
+  state.pending += 1;
+  try {
+    return await attempts(state, target, { timeout, retries, maxWaitMs, maxQueueMs, deadlineMs, priority, budget, init });
+  } finally {
+    state.pending -= 1;
+  }
+}
+
+async function attempts(state, target, { timeout, retries, maxWaitMs, maxQueueMs, deadlineMs, priority, budget, init }) {
   const method = String(init.method || 'GET').toUpperCase();
   const idempotent = method === 'GET' || method === 'HEAD';
   const started = now();
@@ -340,7 +375,7 @@ export async function outboundFetch(
       if (state.pausedUntil - now() > queueMs) {
         throw Object.assign(new Error(`${state.host} is paused after a rate limit`), { code: 'host_paused' });
       }
-      if (!takeBudget(state, priority)) {
+      if (budget && !takeBudget(state, priority)) {
         throw Object.assign(new Error(`hourly request budget for ${state.host} is used up`), { code: 'budget_exhausted' });
       }
       res = await schedule(
@@ -417,20 +452,47 @@ export function cachedJson(url, { ttlMs = 60_000, staleMs = 0, key = String(url)
   );
 }
 
-/** numbers for /api/status and the admin dashboard */
+const statsOf = (s) => ({
+  requests: s.requests,
+  rateLimited: s.limited,
+  retries: s.retries,
+  failures: s.failures,
+  queued: s.queue.length,
+  active: s.active,
+  pausedMs: Math.max(0, s.pausedUntil - now()),
+  ...(s.perHour ? { budget: { perHour: s.perHour, used: budgetUsed(s), denied: s.budgetDenied } } : {}),
+});
+
+/** numbers per host (tests, debugging) */
 export function outboundStats() {
   const out = {};
+  for (const s of hosts.values()) out[s.host] = statsOf(s);
+  return out;
+}
+
+/**
+ * The same numbers for the public /api/status: the file servers of a source
+ * share one line and every host we have no rule for (an own gateway, a test
+ * server) is counted under "other" – so the answer stays small and names no
+ * internal address.
+ */
+export function outboundSummary() {
+  const out = {};
   for (const s of hosts.values()) {
-    out[s.host] = {
-      requests: s.requests,
-      rateLimited: s.limited,
-      retries: s.retries,
-      failures: s.failures,
-      queued: s.queue.length,
-      active: s.active,
-      pausedMs: Math.max(0, s.pausedUntil - now()),
-      ...(s.perHour ? { budget: { perHour: s.perHour, used: budgetUsed(s), denied: s.budgetDenied } } : {}),
-    };
+    const key = s.group || (s.named ? s.host : 'other');
+    const one = statsOf(s);
+    const sum = out[key];
+    if (!sum) {
+      out[key] = key === s.host ? one : { hosts: 1, ...one };
+      continue;
+    }
+    sum.hosts += 1;
+    for (const name of ['requests', 'rateLimited', 'retries', 'failures', 'queued', 'active']) sum[name] += one[name];
+    sum.pausedMs = Math.max(sum.pausedMs, one.pausedMs);
+    if (one.budget) {
+      sum.budget ||= { perHour: 0, used: 0, denied: 0 };
+      for (const name of ['perHour', 'used', 'denied']) sum.budget[name] += one.budget[name];
+    }
   }
   return out;
 }

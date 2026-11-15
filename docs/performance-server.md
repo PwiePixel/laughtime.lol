@@ -44,7 +44,7 @@ Der Medien-Proxy kennt jetzt zwei Varianten derselben Adresse:
 
 `/api/status` hat zwei neue Schlüssel:
 
-- `outbound` – pro Host: Anfragen, Rate-Limits (429), Wiederholungen, Fehler, Warteschlange, laufende Pause und verbrauchtes Stundenkontingent.
+- `outbound` – pro Dienst: Anfragen, Rate-Limits (429), Wiederholungen, Fehler, Warteschlange, laufende Pause und verbrauchtes Stundenkontingent. Die Dateiserver einer Quelle stehen in einer gemeinsamen Zeile, Hosts ohne eigene Regel (z. B. ein eigenes Gateway) unter `other`.
 - `caches` – Suche (Treffer, geteilte Anfragen, Zustand der Quellen), Pool, Medien-Proxy (Cache-Größe, erzeugte Varianten, Warteschlange), API-Cache.
 
 ### Einstellungen (alle optional)

@@ -11,6 +11,8 @@ import {
   hostBudgetLeft,
   hostPausedMs,
   outboundFetch,
+  outboundStats,
+  outboundSummary,
   persistOutbound,
   resetOutbound,
   saveOutboundState,
@@ -18,6 +20,7 @@ import {
 } from '../server/lib/outbound.js';
 import { compressJson, createMicroCache, invalidateAfterWrite, apiCache, pickEncoding } from '../server/lib/respond.js';
 import { createWorkQueue } from '../server/lib/work.js';
+import { isAllowedUrl } from '../server/proxy.js';
 
 // HTTP layer of the custom server (compression, micro cache, 304) and the
 // parts of the outbound protection that are new in this package.
@@ -287,4 +290,47 @@ test('work queue: limited parallelism, bounded waiting list', async () => {
   assert.deepEqual(await Promise.all(jobs), Array(5).fill('done'));
   assert.equal(peak, 2);
   assert.deepEqual(queue.stats(), { active: 0, waiting: 0, done: 5, rejected: 1 });
+});
+
+test('downloads never use up an hourly budget', async () => {
+  handler = (req, res) => res.end('x');
+  setHostBudget(base, 2);
+  for (let i = 0; i < 4; i++) await outboundFetch(`${base}/file-${i}`, { budget: false });
+  assert.equal(hostBudgetLeft(base), 2);
+  await outboundFetch(`${base}/api`);
+  assert.equal(hostBudgetLeft(base), 1);
+});
+
+test('the media proxy takes the file hosts of a source, never an API host', () => {
+  assert.equal(isAllowedUrl('https://static.klipy.com/ii/abc/clip.mp4'), true);
+  assert.equal(isAllowedUrl('https://media2.giphy.com/media/abc/giphy.mp4'), true);
+  assert.equal(isAllowedUrl('https://api.klipy.com/api/v1/key/gifs/search?q=x'), false);
+  assert.equal(isAllowedUrl('https://api.giphy.com/v1/gifs/search?q=x'), false);
+  assert.equal(isAllowedUrl('https://api.imgflip.com/get_memes'), false);
+});
+
+test('the host table forgets idle hosts but keeps budgets and pauses', () => {
+  setHostBudget('api.example.test', 10);
+  // a host without a limit is only an empty entry – as after a finished request
+  for (let i = 0; i < 1000; i++) setHostBudget(`files-${i}.example.test`, 0);
+  const hosts = Object.keys(outboundStats());
+  assert.ok(hosts.length <= 200, `${hosts.length} hosts kept`);
+  assert.ok(hosts.includes('api.example.test'));
+  assert.ok(hosts.includes('files-999.example.test'), 'the latest hosts stay');
+  assert.equal(hostBudgetLeft('api.example.test'), 10);
+});
+
+test('the public numbers group file hosts and name no unknown host', async () => {
+  handler = (req, res) => res.end('x');
+  setHostBudget(base, 5);
+  await outboundFetch(`${base}/x`);
+  for (let i = 0; i < 3; i++) setHostBudget(`cdn${i}.klipy.com`, 0);
+  setHostBudget('api.klipy.com', 90);
+  const summary = outboundSummary();
+  assert.deepEqual(Object.keys(summary).sort(), ['api.klipy.com', 'klipy.com (files)', 'other']);
+  assert.equal(summary['klipy.com (files)'].hosts, 3);
+  assert.equal(summary['api.klipy.com'].budget.perHour, 90);
+  assert.equal(summary.other.requests, 1);
+  assert.deepEqual(summary.other.budget, { perHour: 5, used: 1, denied: 0 });
+  assert.ok(!JSON.stringify(summary).includes('127.0.0.1'));
 });
