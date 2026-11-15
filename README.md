@@ -205,7 +205,7 @@ LaughTime läuft zusätzlich **direkt in Discord** – im Sprachkanal über das 
 1. **OAuth2 → Redirects:** Der Website-Callback (`https://laughtime.lol/api/auth/discord/callback`) bleibt drin – Discord verlangt mindestens eine Redirect-URL, für die Activity selbst wird keine weitere gebraucht.
 2. **Installation → Installation Contexts:** „User Install“ und „Guild Install“ anhaken.
 3. **Activities → URL Mappings:** Root Mapping `PREFIX` = `/`, `TARGET` = `laughtime.lol` – **ohne** `https://`. Weitere Mappings sind nicht nötig: Alle Bilder und Clips laufen über unseren Medien-Proxy, Profilbilder der Teilnehmer kommen von Discords eigenem CDN.
-   - **Beta:** Hauptseite und Beta laufen seit v2 in **einer** Instanz. Die Beta braucht deshalb kein eigenes Mapping-Ziel und keine zweite Discord-App mehr. In Discord entscheidet allein der Host des Mappings über den Kanal (das Beta-Cookie der Website zählt im Discord-Fenster nicht): Mit `laughtime.lol` läuft die Activity im stabilen Kanal. Wer Beta-Funktionen in Discord ausprobieren will, stellt das Ziel vorübergehend auf `beta.laughtime.lol` – gleicher Server, gleiche App, gleiche Konten.
+   - **Beta:** Hauptseite und Beta laufen seit v2 in **einer** Instanz. Die Beta braucht deshalb kein eigenes Mapping-Ziel und keine zweite Discord-App mehr. In Discord läuft die Activity **immer im stabilen Kanal** – egal, auf welchen Host das Mapping zeigt, und das Beta-Cookie der Website zählt im Discord-Fenster nicht (alle im Call teilen sich einen Raum). Beta-Funktionen lassen sich deshalb nur im Browser ausprobieren; das Mapping bleibt auf `laughtime.lol`.
 4. **Activities → Settings:** „Enable Activities“ einschalten, Plattformen (Desktop/Web, iOS, Android) wählen. Discord legt dabei den Start-Befehl (Entry Point Command) an. Die Ausrichtung kann auf „unlocked“ bleiben – die Activity stellt sie auf Telefonen selbst ein.
 5. **Optional, empfohlen – Bot → Token:** Token als `DISCORD_BOT_TOKEN` in die `.env`. Dann prüft der Server bei jedem Beitritt, ob die Activity-Sitzung echt ist und der Spieler wirklich darin ist. Die Antworten werden 30 Sekunden gemerkt, gleichzeitige Anfragen zusammengelegt.
 6. Server neu starten. Kein neuer Build-Schritt nötig.
@@ -228,7 +228,7 @@ Beide sind aus, solange die Variable leer ist. Erlaubt sind nur echte Discord-We
 | `DISCORD_MOD_WEBHOOK_URL` | Hinweis für die Moderatoren bei neuen Meldungen und Pack-Prüfungen |
 | `DISCORD_WEBHOOK_LANG` | Sprache des Moderatoren-Hinweises (`en` oder `de`, Standard `en`) |
 
-**Ankündigen** – der Server selbst schreibt beim Start nie etwas (eine Neustart-Schleife würde den Kanal fluten). Dafür gibt es ein Skript, das der Installer nach einem erfolgreichen Update aufruft:
+**Ankündigen** – der Server selbst schreibt beim Start nie etwas (eine Neustart-Schleife würde den Kanal fluten). Dafür gibt es ein Skript. Der Installer ruft es genau einmal pro Domain auf – nach der ersten erfolgreichen Installation, mit der Meldung „LaughTime v2 is live“ (siehe [docs/installation.md](docs/installation.md)). Ankündigungen zu späteren Updates schickst du selbst:
 
 ```bash
 node scripts/announce.mjs "LaughTime v2 ist da" "Neue Spielmodi!\nViel Spaß."
@@ -237,7 +237,7 @@ node scripts/announce.mjs "Titel" "Text" --url=https://laughtime.lol/news
 
 - liest die `.env` wie `index.js` (echte Umgebungsvariablen gewinnen)
 - dieselbe Ankündigung innerhalb von 10 Minuten wird übersprungen (`--force` schickt sie trotzdem)
-- `--dry-run` prüft nur die Einstellungen, `--strict` beendet sich mit Fehlercode 1, wenn die Nachricht nicht ankam (sonst immer 0, damit ein Update nicht daran scheitert)
+- `--dry-run` prüft nur die Einstellungen, `--strict` beendet sich mit Fehlercode 1, wenn die Nachricht nicht ankam, und mit 3, wenn `DISCORD_WEBHOOK_URL` fehlt oder keine Discord-Webhook-Adresse ist (ohne `--strict` immer 0, damit ein eigenes Update-Skript nicht daran scheitert)
 - `--mod-test` schickt eine Testnachricht an den Moderatoren-Kanal
 
 **Moderatoren-Hinweis:** höchstens eine Nachricht pro Minute. Sie enthält nur Zahlen („3 neue Meldungen (2× Beleidigung, 1× Spam)“, „1 Pack wartet auf eine Prüfung“) und den Link zu `/admin` – keine Namen, keine Inhalte, keine Kommentare.
@@ -398,6 +398,19 @@ Neu in v2 (alle optional, Standardwerte im Code):
 | `DISCORD_WEBHOOK_URL` | – | Webhook für Ankündigungen (`install.sh`, `node scripts/announce.mjs "Titel" "Text"`) |
 | `DISCORD_MOD_WEBHOOK_URL` | – | Webhook für Moderations-Hinweise (nur Anzahl und Kategorie, keine Namen) |
 | `DISCORD_WEBHOOK_LANG` | en | Sprache der Moderations-Hinweise (`en`/`de`) |
+
+Für Sonderfälle und Tests (stehen bewusst nicht in `.env.example`, alle optional):
+
+| Variable | Standard | Bedeutung |
+|---|---|---|
+| `SERVER_IP` | – | Adresse, an die der Server bindet, wenn `HOST` nicht gesetzt ist (setzt Pterodactyl) |
+| `DISCORD_REDIRECT_URI` | `<PUBLIC_URL>/api/auth/discord/callback` | abweichende Rücksprung-Adresse des Discord-Logins |
+| `DISCORD_AUTHORIZE_URL` | `https://discord.com/oauth2/authorize` | Anmeldeseite von Discord (nur für Tests mit einer nachgebauten API) |
+| `DISCORD_API_URL` | `https://discord.com/api` | Discord-API (nur für Tests, siehe „Lokal testen“) |
+| `GIPHY_API_URL`, `KLIPY_API_URL` | offizielle APIs | eigene Gateways oder Test-Server für die Suche |
+| `ACTIVITY_DEV_FRAME` | – | lokale Testseite, die `/activity` einbetten darf |
+| `LT_DEV` | – | `1` startet wie `node index.js --dev` |
+| `FORCE_BUILD` | – | `1` erzwingt einen Neubau beim Start |
 
 ---
 
