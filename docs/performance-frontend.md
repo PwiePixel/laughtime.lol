@@ -10,7 +10,7 @@ LaughTime v2 lädt spürbar schneller – ohne dass du etwas einstellen musst. E
 - **Suche beim Tippen:** Studio-Suche, Pack-Auswahl, Admin-Nutzersuche und Galerie-Filter schicken erst eine Anfrage, wenn kurz nichts mehr getippt bzw. geklickt wird (`lib/timing.js`).
 - **Bilder in passender Größe:** Bilder aus dem Medien-Proxy werden mit `&w=<Breite>` in der Größe angefordert, in der sie angezeigt werden (160, 320, 480, 640, 960 oder 1280 px; das Format wählt der Server). Uploads, GIFs und Clips bleiben unverändert. **Download und GIF-Export nutzen immer das Original.**
 - **Nichts springt:** Bilder und Clips haben von Anfang an ihren festen Platz, ein dezenter Schimmer hält ihn frei, das Medium blendet weich ein. Clips laden zuerst nur ihre Metadaten und spielen nur, solange sie im Bild sind.
-- **Browser-Cache:** Bilder und Schriften aus `public/` dürfen 1 Tag gecacht werden (danach 30 Tage „alte Kopie zeigen, im Hintergrund neu holen“). Dateien unter `/_next/static` sind dauerhaft cachebar, weil ihr Name sich bei jeder Änderung ändert. Im Entwicklungsmodus (`--dev`) ist das abgeschaltet.
+- **Browser-Cache:** Bilder aus `public/` (Ordner `images`, `icons`, `screenshots` sowie Logo und Banner) dürfen 1 Tag gecacht werden (danach 30 Tage „alte Kopie zeigen, im Hintergrund neu holen“). Dateien unter `/_next/static` sind dauerhaft cachebar, weil ihr Name sich bei jeder Änderung ändert. Im Entwicklungsmodus (`--dev`) ist das abgeschaltet.
 - **Schwere Teile nur bei Bedarf:** Meme-Export samt GIF-Encoder, die Admin-Diagramme und das Discord-SDK werden erst geladen, wenn sie wirklich gebraucht werden.
 
 ### Bilder in `public/` austauschen

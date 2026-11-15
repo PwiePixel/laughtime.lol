@@ -1,10 +1,12 @@
 import { PHASE_DEVELOPMENT_SERVER } from 'next/constants.js';
 
-// Pictures and fonts in public/ have no hash in their name: browsers may keep
+// Pictures in public/ have no hash in their name: browsers may keep
 // them for a day and afterwards show the old copy once more while they fetch
 // the new one in the background.
 const STATIC_CACHE = 'public, max-age=86400, stale-while-revalidate=2592000';
-const STATIC_FILES = 'png|jpg|jpeg|gif|webp|avif|svg|ico|woff|woff2|ttf|otf';
+// Exactly what lives in public/ – never "any address that ends in .png": a
+// profile page like /u/doge.png is a page and must not be stored anywhere.
+const STATIC_SOURCES = ['/:dir(images|icons|screenshots)/:path+', '/:file((?:logo|logo-mark|banner|icon-512)\\.(?:png|svg))'];
 
 /** @type {(phase: string) => import('next').NextConfig} */
 const nextConfig = (phase) => ({
@@ -22,18 +24,13 @@ const nextConfig = (phase) => ({
   },
   async headers() {
     return [
-      // Long-lived caching for the static pictures and fonts in public/.
-      // Hashed files under /_next/static are sent as "immutable" for a year by
-      // Next itself and are left out here; /api/media and uploads get their
-      // headers from server/. Not in development: a changed file shows up at once.
+      // Long-lived caching for the static pictures in public/.
+      // Hashed files under /_next/static (fonts included) are sent as "immutable"
+      // for a year by Next itself; /api/media and uploads get their headers
+      // from server/. Not in development: a changed file shows up at once.
       ...(phase === PHASE_DEVELOPMENT_SERVER
         ? []
-        : [
-            {
-              source: `/:file((?!_next/).+\\.(?:${STATIC_FILES}))`,
-              headers: [{ key: 'Cache-Control', value: STATIC_CACHE }],
-            },
-          ]),
+        : STATIC_SOURCES.map((source) => ({ source, headers: [{ key: 'Cache-Control', value: STATIC_CACHE }] }))),
       {
         source: '/:path*',
         headers: [

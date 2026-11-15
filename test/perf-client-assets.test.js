@@ -4,6 +4,8 @@ import path from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { PHASE_DEVELOPMENT_SERVER, PHASE_PRODUCTION_BUILD, PHASE_PRODUCTION_SERVER } from 'next/constants.js';
+// the matcher Next itself uses for the `source` of a header rule
+import pathMatcher from 'next/dist/compiled/path-to-regexp/index.js';
 import sharp from 'sharp';
 import nextConfig from '../next.config.mjs';
 
@@ -56,24 +58,35 @@ test('the share banner is still a 1200 × 630 PNG', async () => {
 const rulesFor = async (phase) => nextConfig(phase).headers();
 const cacheRules = (rules) => rules.filter((r) => r.headers.some((h) => h.key.toLowerCase() === 'cache-control'));
 
-test('static pictures and fonts are cached for long in production, not in development', async () => {
+test('static pictures are cached for long in production, not in development', async () => {
   for (const phase of [PHASE_PRODUCTION_BUILD, PHASE_PRODUCTION_SERVER]) {
     const rules = cacheRules(await rulesFor(phase));
-    assert.equal(rules.length, 1);
-    const value = rules[0].headers[0].value;
-    assert.match(value, /public/);
-    assert.match(value, /max-age=\d{5,}/);
-    assert.match(value, /stale-while-revalidate=\d{6,}/);
-    // un-hashed files must never be "immutable"
-    assert.doesNotMatch(value, /immutable/);
-    const source = rules[0].source;
-    assert.match(source, /png/);
-    assert.match(source, /woff2/);
-    // hashed build files keep the headers Next gives them; service worker and manifest are not covered
-    assert.match(source, /\(\?!_next\/\)/);
-    assert.doesNotMatch(source, /\bjs\b|json/);
+    assert.equal(rules.length, 2);
+    for (const rule of rules) {
+      const value = rule.headers[0].value;
+      assert.match(value, /public/);
+      assert.match(value, /max-age=\d{5,}/);
+      assert.match(value, /stale-while-revalidate=\d{6,}/);
+      // un-hashed files must never be "immutable"
+      assert.doesNotMatch(value, /immutable/);
+    }
   }
   assert.equal(cacheRules(await rulesFor(PHASE_DEVELOPMENT_SERVER)).length, 0);
+});
+
+test('the long cache header covers the files in public/ and no page', async () => {
+  const sources = cacheRules(await rulesFor(PHASE_PRODUCTION_SERVER)).map((r) => pathMatcher.pathToRegexp(r.source));
+  const cached = (pathname) => sources.some((re) => re.test(pathname));
+  const walk = (dir, base = '') =>
+    fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(path.join(dir, e.name), `${base}/${e.name}`) : [`${base}/${e.name}`]));
+  for (const file of walk(pub(''))) {
+    // service worker and manifest change with a release and are asked for every time
+    assert.equal(cached(file), !['/sw.js', '/manifest.json'].includes(file), file);
+  }
+  // user names may end like a picture, room codes and news ids come from the address bar
+  for (const page of ['/u/doge.png', '/u/cat.gif', '/room/ABCDE.svg', '/news/x.jpg', '/m/abc.webp', '/_next/static/media/a.woff2', '/api/x.png', '/images', '/favicon.ico']) {
+    assert.equal(cached(page), false, page);
+  }
 });
 
 test('security headers and the Discord frame rule are unchanged', async () => {
