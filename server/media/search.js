@@ -1,4 +1,5 @@
 import { getConfig } from '../config.js';
+import { createLimiter } from '../http.js';
 import { createBackoff, createTtlCache, dedupe, hostPausedMs } from '../lib/outbound.js';
 import { isAllowedUrl } from '../proxy.js';
 import { giphyBase, giphyItem } from './giphy.js';
@@ -20,6 +21,8 @@ import { klipyBase, klipyList, klipyParams, toItem as klipyItem } from './klipy.
 //   - a provider that fails or is rate limited is skipped for a growing pause;
 //     the search then answers with the other providers and the template pool
 //   - every request goes through the outbound queue (hourly budget, 429 pause)
+//   - one person can only use a part of an hourly budget; after that their new
+//     searches are answered without that provider (see "personal share")
 // ---------------------------------------------------------------------------
 
 const EMPTY_TTL = 3 * 60 * 1000; // "nothing found" – new content may show up soon
@@ -43,7 +46,7 @@ function searchCache() {
   }
   return cache;
 }
-const counts = { hits: 0, misses: 0, shared: 0, degraded: 0 };
+const counts = { hits: 0, misses: 0, shared: 0, degraded: 0, limited: 0 };
 
 // Searches must feel instant: short timeouts, at most one retry, no long waiting
 // in a queue. 'low' priority keeps a part of the hourly budget free for the pool.
@@ -78,6 +81,43 @@ async function ask(name, origin, fn) {
       console.warn(`[search] ${name}: ${String(err?.message || err).slice(0, 120)} – paused for ${Math.round(pause / 1000)} s`);
     }
     return { ok: false, value: null };
+  }
+}
+
+// --- personal share ------------------------------------------------------------
+// The hourly budgets are for all players together. Without a limit per person
+// one account (or one guest with a script) could use them up within minutes and
+// switch the search off for everybody else.
+
+const SEARCH_PART = 0.8; // what searches may use of a budget (the rest is for the pool)
+const ACCOUNT_PART = 0.25; // … and one account of that
+const GUEST_PART = 0.5; // guests count per address, which several players may share
+const used = createLimiter({ windowMs: 60 * 60 * 1000, max: Infinity });
+
+/** requests one new search sends to a provider */
+const callsOf = (name, kind, cfg) => (name === 'imgflip' ? (kind === 'any' ? 2 : 1) : name === 'klipy' ? cfg.klipyTypes.length : 1);
+
+function activeProviders(kind, cfg) {
+  const wantVideo = kind !== 'image';
+  return PROVIDERS.filter((name) => (name === 'imgflip' ? cfg.imgflipEnabled : wantVideo && cfg[`${name}Key`]));
+}
+
+/** calls per hour one person may cause at a provider (Infinity without a budget) */
+function shareOf(name, who, cfg) {
+  const limit = cfg[`${name}HourlyLimit`];
+  if (!(limit > 0)) return Infinity;
+  const part = who.startsWith('u:') ? ACCOUNT_PART : GUEST_PART;
+  return Math.max(callsOf(name, 'any', cfg), Math.floor(limit * SEARCH_PART * part));
+}
+
+/** providers this person may not call for a new search any more */
+const overShare = (who, kind, cfg) =>
+  activeProviders(kind, cfg).filter((name) => used.count(`${name}|${who}`) + callsOf(name, kind, cfg) > shareOf(name, who, cfg));
+
+function charge(who, kind, cfg, skip = []) {
+  for (const name of activeProviders(kind, cfg)) {
+    if (skip.includes(name)) continue;
+    for (let i = callsOf(name, kind, cfg); i > 0; i--) used.hit(`${name}|${who}`);
   }
 }
 
@@ -215,13 +255,14 @@ export function searchKey(q, kind = 'any') {
   return `${kind}|${norm}`;
 }
 
-async function runSearch(q, kind, key) {
+/** skip: providers that are left out (personal share used up) – such an answer is never cached */
+async function runSearch(q, kind, key, skip = []) {
   const cfg = getConfig();
-  const wantVideo = kind !== 'image';
+  const on = activeProviders(kind, cfg).filter((name) => !skip.includes(name));
   const jobs = [];
-  if (cfg.imgflipEnabled) jobs.push(ask('imgflip', originOf(endpoints.imgflipSearch), () => searchImgflip(q, kind)).then((r) => ({ ...r, multi: true })));
-  if (wantVideo && cfg.giphyKey) jobs.push(ask('giphy', originOf(giphyBase(cfg)), () => searchGiphy(q)));
-  if (wantVideo && cfg.klipyKey) jobs.push(ask('klipy', originOf(klipyBase(cfg)), () => searchKlipy(q)));
+  if (on.includes('imgflip')) jobs.push(ask('imgflip', originOf(endpoints.imgflipSearch), () => searchImgflip(q, kind)).then((r) => ({ ...r, multi: true })));
+  if (on.includes('giphy')) jobs.push(ask('giphy', originOf(giphyBase(cfg)), () => searchGiphy(q)));
+  if (on.includes('klipy')) jobs.push(ask('klipy', originOf(klipyBase(cfg)), () => searchKlipy(q)));
   const answers = await Promise.all(jobs);
   // degraded: a provider is missing completely or answered only in part
   const degraded = answers.some((a) => !a.ok || a.value.partial);
@@ -243,6 +284,7 @@ async function runSearch(q, kind, key) {
     }
   }
 
+  if (skip.length) return merged;
   const store = searchCache();
   if (degraded) {
     counts.degraded += 1;
@@ -264,9 +306,11 @@ async function runSearch(q, kind, key) {
 /**
  * Search all sources.
  * kind: 'image' | 'video' | 'any'
+ * who:  the person who asks ('u:<account id>', otherwise a guest key such as the
+ *       address hash) – new searches count against their share of the budgets
  * Returns a de-duplicated, filtered list (sources mixed evenly).
  */
-export async function searchMedia(query, { kind = 'any' } = {}) {
+export async function searchMedia(query, { kind = 'any', who = '' } = {}) {
   const q = cleanQuery(query);
   if (q.length < QUERY_MIN || isBlocked(q)) return [];
   if (!['image', 'video'].includes(kind)) kind = 'any';
@@ -278,13 +322,28 @@ export async function searchMedia(query, { kind = 'any' } = {}) {
     // files that broke in the meantime are not offered again
     items = hit.items.filter((i) => !isBroken(i.url));
   } else {
-    let shared = true;
-    items = await dedupe(`search:${key}`, () => {
-      shared = false;
-      counts.misses += 1;
-      return runSearch(q, kind, key);
-    });
-    if (shared) counts.shared += 1;
+    const cfg = getConfig();
+    const skip = who ? overShare(who, kind, cfg) : [];
+    if (skip.length) {
+      counts.limited += 1;
+      // an older complete answer first, else what the other providers and the pool have
+      const old = searchCache().peek(key);
+      if (old && !old.degraded) {
+        items = old.items;
+      } else {
+        charge(who, kind, cfg, skip);
+        items = await runSearch(q, kind, key, skip);
+      }
+    } else {
+      let shared = true;
+      items = await dedupe(`search:${key}`, () => {
+        shared = false;
+        counts.misses += 1;
+        if (who) charge(who, kind, cfg);
+        return runSearch(q, kind, key);
+      });
+      if (shared) counts.shared += 1;
+    }
   }
   // also for cached answers: the studio may add these items by id for the next two hours
   remember(items);
@@ -322,6 +381,7 @@ export const _test = {
       breakers[name].succeed();
       Object.assign(providerCounts[name], { calls: 0, errors: 0, skipped: 0 });
     }
-    Object.assign(counts, { hits: 0, misses: 0, shared: 0, degraded: 0 });
+    Object.assign(counts, { hits: 0, misses: 0, shared: 0, degraded: 0, limited: 0 });
+    used.clear();
   },
 };

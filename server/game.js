@@ -89,6 +89,8 @@ const shuffle = (arr) => {
 };
 // the media search can be replaced in tests
 let search = searchMedia;
+/** whose share of the hourly search budgets a search counts against (guests: per address) */
+const searcherOf = (player) => (player.userId ? `u:${player.userId}` : `g:${player.ipHash || player.id}`);
 export const _test = {
   setSearch(fn) {
     search = fn || searchMedia;
@@ -736,7 +738,7 @@ async function runHuntSearch(room, sub, player, q) {
   const kind = kindFor(room, player.id);
   let items = [];
   try {
-    items = (await search(q, { kind })) || [];
+    items = (await search(q, { kind, who: searcherOf(player) })) || [];
   } catch (err) {
     console.warn('[hunt] search failed', err.message);
   }
@@ -1852,7 +1854,7 @@ function handleMessage(ws, msg) {
       touch(room, player);
       sendState(room, player);
       const kind = kindFor(room, player.id);
-      search(q, { kind })
+      search(q, { kind, who: searcherOf(player) })
         .then((items) => {
           const list = (items || []).filter((i) => !isBroken(i.url)).slice(0, 30);
           // only while this bring phase runs - the list is dropped when it ends

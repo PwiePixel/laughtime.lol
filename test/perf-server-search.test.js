@@ -215,6 +215,28 @@ test('the hourly budget stops requests before the API can complain', async () =>
   assert.equal(budget.denied, 4);
 });
 
+test('one person cannot use up the hourly budget for everybody else', async () => {
+  cfg.giphyHourlyLimit = 20; // searches may use 16 of it, one account a quarter of that
+  httpTest.resetBudgets();
+  handlers['/giphy/search'] = (req, res) => sendJson(res, 200, { data: [giphyClip('s1', 'Share')] });
+  const answers = [];
+  for (let i = 0; i < 12; i++) answers.push(await searchMedia(`greedy ${i}`, { kind: 'video', who: 'u:1' }));
+  assert.equal(hits['/giphy/search'], 4, 'only the personal share reached the API');
+  assert.equal(answers.filter((items) => items.length).length, 4);
+  assert.equal(searchStats().cache.limited, 8);
+  assert.equal(hostBudgetLeft(base, 'low'), 12);
+
+  // the next player still gets real results – also for a term the first one was refused
+  assert.equal((await searchMedia('greedy 11', { kind: 'video', who: 'u:2' })).length, 1);
+  assert.equal(hits['/giphy/search'], 5);
+  // answers from the cache are free for everybody
+  assert.equal((await searchMedia('greedy 0', { kind: 'video', who: 'u:1' })).length, 1);
+  assert.equal(hits['/giphy/search'], 5);
+  // guests are counted per address, which several players may share: twice the share
+  for (let i = 0; i < 12; i++) await searchMedia(`guest ${i}`, { kind: 'video', who: 'g:abc' });
+  assert.equal(hits['/giphy/search'], 13);
+});
+
 test('Imgflip search pages are parsed, cached and limited like the APIs', async () => {
   cfg.imgflipEnabled = true;
   cfg.giphyKey = '';

@@ -128,5 +128,8 @@ export function createLimiter({ windowMs, max }) {
     reset(key) {
       hits.delete(key);
     },
+    clear() {
+      hits.clear();
+    },
   };
 }

@@ -278,7 +278,7 @@ async function studioSearch(res, ctx, q) {
   const kind = ['image', 'video'].includes(q.get('kind')) ? q.get('kind') : 'any';
   const query = cleanQuery(q.get('q'));
   if (query && isBlocked(query)) return json(res, 200, { items: [], blocked: true });
-  const items = query.length >= 2 ? (await searchMedia(query, { kind })).slice(0, 60) : browseMedia(kind, 40);
+  const items = query.length >= 2 ? (await searchMedia(query, { kind, who: `u:${user.id}` })).slice(0, 60) : browseMedia(kind, 40);
   for (const m of items.slice(0, 12)) warmMedia(m.url);
   return json(res, 200, { query, items: items.map(studioItem) });
 }

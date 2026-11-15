@@ -23,6 +23,7 @@ Der Medien-Proxy kennt jetzt zwei Varianten derselben Adresse:
 - Suchergebnisse (GIF-Jagd, Tausch-Runde, Studio) werden pro Suchbegriff 15 Minuten gemerkt, „nichts gefunden“ 3 Minuten. Fällt danach eine Quelle aus, dient der alte Stand noch als Ersatz – spätestens eine Stunde nach der Suche sind Begriff und Treffer aus dem Speicher gelöscht.
 - Suchen mehrere Leute gleichzeitig dasselbe, geht nur eine Anfrage raus.
 - Fällt eine Quelle aus oder bremst sie (HTTP 429), wird sie für eine wachsende Pause übersprungen. Die Suche antwortet dann mit den übrigen Quellen und dem eigenen Vorlagen-Pool.
+- Eine einzelne Person kann die Stundenkontingente nicht allein aufbrauchen: Pro Konto zählt höchstens ein Viertel des Suchanteils (bei 90 pro Stunde: 18 neue Suchanfragen an eine Quelle), Gäste zählen pro Adresse mit der Hälfte. Danach beantwortet der Server neue Suchen dieser Person ohne diese Quelle (übrige Quellen und Vorlagen-Pool); schon gemerkte Suchergebnisse bleiben für alle kostenlos.
 - Pro Stunde gehen höchstens `GIPHY_HOURLY_LIMIT` / `KLIPY_HOURLY_LIMIT` Anfragen an die APIs (Standard 90, passend zu kostenlosen Schlüsseln). **Mit einem Produktionsschlüssel kannst du die Werte hochsetzen, `0` schaltet die Grenze ab.**
 
 ### Vorlagen-Pool übersteht Neustarts
