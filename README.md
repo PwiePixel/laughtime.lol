@@ -94,11 +94,11 @@ Ab drei Mitspielern gibt es bis zu vier Auszeichnungen. Sie bringen keine Punkte
 | Auszeichnung | Wofür | Modus |
 | --- | --- | --- |
 | Meme des Spiels | bestes einzelnes Meme | alle |
-| On Fire | längste Serie gewonnener Runden | alle |
+| Siegesserie | längste Serie gewonnener Runden | alle |
 | Publikumsliebling | meiste Reaktionen auf die eigenen Memes | alle |
 | Dauerbrenner | bester Durchschnitt | alle |
 | Bester Lieferant | meister Bild-Bonus | Tausch-Runde |
-| Volltreffer | bestes Meme mit nur einer Suche | GIF-Jagd |
+| Volltreffer | bestes Meme mit höchstens einer Suche (der Glücksgriff zählt nicht als Suche) | GIF-Jagd |
 
 ### Streamer-Modus
 

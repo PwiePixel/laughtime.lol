@@ -9,7 +9,7 @@ Der Kanal schaltet nur Funktionen frei. Konten, Räume, Bestenlisten und Memes s
 
 ### Was Besucher sehen
 
-- `/beta`: Erklärung, aktueller Kanal, Schalter „Beta beitreten / Zurück zu Stable“, Liste der Funktionen und Spielmodi, die gerade in der Beta sind, Version und (optional) ein Feedback-Link.
+- `/beta`: Erklärung, aktueller Kanal, Schalter „Beta beitreten / Beta verlassen“, Liste der Funktionen und Spielmodi, die gerade in der Beta sind, Version und (optional) ein Feedback-Link.
 - Im Beta-Kanal steht neben dem Logo ein kleines **BETA**-Schild.
 - Beta-Hosts werden mit `X-Robots-Tag: noindex` ausgeliefert und landen nicht in Suchmaschinen.
 

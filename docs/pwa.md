@@ -1,6 +1,6 @@
 ## LaughTime als App (PWA)
 
-laughtime.lol lässt sich auf dem Handy wie eine App installieren: eigenes Icon auf dem Homescreen, Start ohne Browserleiste, Hochformat.
+laughtime.lol lässt sich auf dem Handy wie eine App installieren: eigenes Icon auf dem Startbildschirm, Start ohne Browserleiste, Hochformat.
 
 ### Was Spieler davon haben
 
