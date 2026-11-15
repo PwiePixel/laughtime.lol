@@ -18,7 +18,7 @@ import {
   saveOutboundState,
   setHostBudget,
 } from '../server/lib/outbound.js';
-import { compressJson, createMicroCache, invalidateAfterWrite, apiCache, pickEncoding } from '../server/lib/respond.js';
+import { compressJson, createMicroCache, invalidateAfterWrite, apiCache, cacheKey, pickEncoding } from '../server/lib/respond.js';
 import { createWorkQueue } from '../server/lib/work.js';
 import { isAllowedUrl } from '../server/proxy.js';
 
@@ -333,4 +333,12 @@ test('the public numbers group file hosts and name no unknown host', async () =>
   assert.equal(summary.other.requests, 1);
   assert.deepEqual(summary.other.budget, { perHour: 5, used: 1, denied: 0 });
   assert.ok(!JSON.stringify(summary).includes('127.0.0.1'));
+});
+
+test('cache keys of lists: a missing value never meets the text "null", separators cannot collide', () => {
+  const key = (user, limit) => cacheKey('memes', { sort: 'top', period: 'all', username: user, limit, offset: null });
+  assert.notEqual(key(null, null), key('null', null));
+  assert.notEqual(key(null, null), key(null, 'null'));
+  assert.equal(key(null, '24'), key(null, '24'));
+  assert.notEqual(cacheKey('packs', { q: 'a:1', limit: null }), cacheKey('packs', { q: 'a', limit: '1:null' }));
 });

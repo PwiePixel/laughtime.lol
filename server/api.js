@@ -30,7 +30,7 @@ import { handleActivityApi, isActivityRequest } from './activity.js';
 import { handleBetaApi, loginHandover, loginReturn, redeemLoginHandover } from './beta.js';
 import { exchangeCode, fetchUser } from './discord.js';
 import { HttpError, checkOrigin, clientIp, createLimiter, isHttps, json, parseCookies, readJson, redirect, serializeCookie } from './http.js';
-import { apiCache } from './lib/respond.js';
+import { apiCache, cacheKey } from './lib/respond.js';
 import { browseMedia, cleanQuery, isBlocked, searchMedia } from './media/search.js';
 import { addPackItem, addPackUpload, createPack, deletePack, getPack, listPacks, listReviews, removePackItem, reviewPack, updatePack } from './packs.js';
 import { readUpload } from './uploads.js';
@@ -286,10 +286,11 @@ async function studioSearch(res, ctx, q) {
 async function packRoutes(req, res, ctx, p, method, q) {
   if (p === '/api/packs' && method === 'GET') {
     const scope = q.get('scope') === 'mine' ? 'mine' : 'public';
-    const list = () => listPacks({ scope, viewer: ctx.user, q: q.get('q') || '', limit: q.get('limit'), offset: q.get('offset') });
+    const args = { q: q.get('q') || '', limit: q.get('limit'), offset: q.get('offset') };
+    const list = () => listPacks({ scope, viewer: ctx.user, ...args });
     // the public list looks the same for every guest: cached for a moment (never for accounts)
     if (scope === 'public' && !ctx.user) {
-      apiCache.send(req, res, `packs:${q.get('q') || ''}:${q.get('limit')}:${q.get('offset')}`, 10_000, list, { cacheControl: 'private, no-cache' });
+      apiCache.send(req, res, cacheKey('packs', args), 10_000, list, { cacheControl: 'private, no-cache' });
     } else json(res, 200, list());
     return true;
   }
@@ -534,19 +535,17 @@ export async function handleApi(req, res, url) {
       return true;
     }
     if (p === '/api/memes' && method === 'GET') {
-      const list = () =>
-        listMemes({
-          sort: q.get('sort') || 'top',
-          period: q.get('period') || 'all',
-          username: q.get('user') || null,
-          viewer: ctx.user,
-          limit: q.get('limit'),
-          offset: q.get('offset'),
-        });
+      const args = {
+        sort: q.get('sort') || 'top',
+        period: q.get('period') || 'all',
+        username: q.get('user') || null,
+        limit: q.get('limit'),
+        offset: q.get('offset'),
+      };
+      const list = () => listMemes({ ...args, viewer: ctx.user });
       // guests all see the same list; with an account it contains "liked by me" and is never cached
       if (!ctx.user) {
-        const key = `memes:${q.get('sort')}:${q.get('period')}:${q.get('user')}:${q.get('limit')}:${q.get('offset')}`;
-        apiCache.send(req, res, key, 10_000, list, { cacheControl: 'private, no-cache' });
+        apiCache.send(req, res, cacheKey('memes', args), 10_000, list, { cacheControl: 'private, no-cache' });
       } else json(res, 200, list());
       return true;
     }

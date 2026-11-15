@@ -197,6 +197,13 @@ export function createMicroCache({ max = 400 } = {}) {
 export const apiCache = createMicroCache({ max: 400 });
 
 /**
+ * Key of a cached list: made from the values the list is really computed with.
+ * JSON keeps "no value" and the text "null" apart, and a separator typed into
+ * a value cannot run into the next one.
+ */
+export const cacheKey = (name, args) => `${name}:${JSON.stringify(Object.values(args))}`;
+
+/**
  * A request that changed something was answered: answers in the cache may be
  * out of date. Writes are rare compared to reads, so simply everything goes –
  * except for room creation, which changes none of the cached lists.
