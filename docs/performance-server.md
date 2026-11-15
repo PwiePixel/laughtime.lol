@@ -20,7 +20,7 @@ Der Medien-Proxy kennt jetzt zwei Varianten derselben Adresse:
 
 ### Suche ohne API-Spam
 
-- Suchergebnisse (GIF Hunt, Tauschrunde, Studio) werden pro Suchbegriff 15 Minuten gemerkt, „nichts gefunden“ 3 Minuten.
+- Suchergebnisse (GIF-Jagd, Tausch-Runde, Studio) werden pro Suchbegriff 15 Minuten gemerkt, „nichts gefunden“ 3 Minuten. Fällt danach eine Quelle aus, dient der alte Stand noch als Ersatz – spätestens eine Stunde nach der Suche sind Begriff und Treffer aus dem Speicher gelöscht.
 - Suchen mehrere Leute gleichzeitig dasselbe, geht nur eine Anfrage raus.
 - Fällt eine Quelle aus oder bremst sie (HTTP 429), wird sie für eine wachsende Pause übersprungen. Die Suche antwortet dann mit den übrigen Quellen und dem eigenen Vorlagen-Pool.
 - Pro Stunde gehen höchstens `GIPHY_HOURLY_LIMIT` / `KLIPY_HOURLY_LIMIT` Anfragen an die APIs (Standard 90, passend zu kostenlosen Schlüsseln). **Mit einem Produktionsschlüssel kannst du die Werte hochsetzen, `0` schaltet die Grenze ab.**
@@ -54,7 +54,7 @@ Der Medien-Proxy kennt jetzt zwei Varianten derselben Adresse:
 | `GIPHY_HOURLY_LIMIT` | `90` | max. Anfragen pro Stunde an GIPHY (`0` = unbegrenzt) |
 | `KLIPY_HOURLY_LIMIT` | `90` | max. Anfragen pro Stunde an KLIPY (`0` = unbegrenzt) |
 | `IMGFLIP_HOURLY_LIMIT` | `600` | max. Seitenabrufe pro Stunde bei imgflip.com (`0` = unbegrenzt) |
-| `SEARCH_CACHE_MINUTES` | `15` | wie lange Suchergebnisse gemerkt werden |
+| `SEARCH_CACHE_MINUTES` | `15` | wie lange Suchergebnisse gemerkt werden (1–60) |
 | `SEARCH_CACHE_ENTRIES` | `500` | wie viele verschiedene Suchen gemerkt werden |
 | `IMAGE_VARIANTS` | `true` | verkleinerte AVIF/WebP-Varianten (`false` = immer das Original) |
 | `IMAGE_AVIF` | `true` | AVIF für kleine Bilder (`false` = nur WebP, spart CPU) |

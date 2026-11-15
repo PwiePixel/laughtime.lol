@@ -390,7 +390,7 @@ Neu in v2 (alle optional, Standardwerte im Code):
 | `FEATURE_FLAGS` | – | einzelne Funktionen freischalten/abschalten, z. B. `liveStatus=stable` |
 | `GIPHY_HOURLY_LIMIT`, `KLIPY_HOURLY_LIMIT` | 90 | höchstens so viele API-Anfragen pro Stunde (0 = unbegrenzt; mit Produktionsschlüssel erhöhen) |
 | `IMGFLIP_HOURLY_LIMIT` | 600 | Seitenabrufe pro Stunde bei imgflip.com |
-| `SEARCH_CACHE_MINUTES`, `SEARCH_CACHE_ENTRIES` | 15 / 500 | wie lange und wie viele Suchergebnisse im Speicher bleiben |
+| `SEARCH_CACHE_MINUTES`, `SEARCH_CACHE_ENTRIES` | 15 / 500 | wie lange (1–60 Minuten) und wie viele Suchergebnisse im Speicher bleiben |
 | `IMAGE_VARIANTS` | true | verkleinerte AVIF/WebP-Varianten im Medien-Proxy |
 | `IMAGE_AVIF` | true | AVIF für kleine Bilder (false = nur WebP, spart CPU) |
 | `IMAGE_WORKERS` | 2 | gleichzeitige Bildumwandlungen (1–8) |

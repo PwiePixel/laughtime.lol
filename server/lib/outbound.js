@@ -75,6 +75,15 @@ export function createTtlCache({ ttlMs = 60_000, max = 500 } = {}) {
     clear() {
       entries.clear();
     },
+    /**
+     * Drop everything that is past its time. Reading does that for the key that
+     * is asked – this is for the entries nobody asks for again.
+     */
+    sweep() {
+      const t = now();
+      for (const [key, entry] of entries) if (entry.expires <= t && entry.staleUntil <= t) entries.delete(key);
+      return entries.size;
+    },
     /** numbers for /api/status */
     stats() {
       return { size: entries.size, max, ...counts };

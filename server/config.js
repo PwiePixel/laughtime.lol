@@ -72,8 +72,9 @@ export function getConfig() {
     giphyHourlyLimit: Math.max(0, num(e.GIPHY_HOURLY_LIMIT, 90)),
     klipyHourlyLimit: Math.max(0, num(e.KLIPY_HOURLY_LIMIT, 90)),
     imgflipHourlyLimit: Math.max(0, num(e.IMGFLIP_HOURLY_LIMIT, 600)),
-    // how long search results are kept, and how many different searches
-    searchCacheMs: Math.max(1, Math.min(24 * 60, num(e.SEARCH_CACHE_MINUTES, 15))) * 60 * 1000,
+    // how long search results are kept (at most an hour – that is what the privacy text
+    // promises), and how many different searches
+    searchCacheMs: Math.max(1, Math.min(60, num(e.SEARCH_CACHE_MINUTES, 15))) * 60 * 1000,
     searchCacheMax: Math.max(50, Math.min(5000, num(e.SEARCH_CACHE_ENTRIES, 500))),
 
     // image pipeline of the media proxy (/api/media?u=…&w=…)

@@ -24,12 +24,25 @@ import { klipyBase, klipyList, klipyParams, toItem as klipyItem } from './klipy.
 
 const EMPTY_TTL = 3 * 60 * 1000; // "nothing found" – new content may show up soon
 const DEGRADED_TTL = 45 * 1000; // a provider was missing – ask again soon
-const STALE_MS = 60 * 60 * 1000; // old results stay as a fallback for a degraded search
+// A search term and its results leave the memory at most one hour after the
+// search (the privacy text says so): the cache time plus the time old results
+// stay as a fallback for a degraded search never exceed MAX_LIFE_MS, and a
+// sweep removes what nobody asked for again.
+const SWEEP_MS = 60 * 1000;
+const MAX_LIFE_MS = 60 * 60 * 1000 - SWEEP_MS;
 const KNOWN_TTL = 2 * 60 * 60 * 1000;
 const known = new Map(); // id -> { at, item }
 
-let cache = null; // key -> { items, degraded }
-const searchCache = () => (cache ||= createTtlCache({ ttlMs: getConfig().searchCacheMs, max: getConfig().searchCacheMax }));
+let cache = null; // key -> { items, degraded, at }
+let sweeper = null;
+function searchCache() {
+  if (!cache) {
+    cache = createTtlCache({ ttlMs: getConfig().searchCacheMs, max: getConfig().searchCacheMax });
+    sweeper ||= setInterval(() => cache?.sweep(), SWEEP_MS);
+    sweeper.unref?.();
+  }
+  return cache;
+}
 const counts = { hits: 0, misses: 0, shared: 0, degraded: 0 };
 
 // Searches must feel instant: short timeouts, at most one retry, no long waiting
@@ -235,13 +248,16 @@ async function runSearch(q, kind, key) {
     counts.degraded += 1;
     // a complete answer from earlier beats what is left while a provider is down
     const old = store.peek(key);
-    if (old && !old.degraded && old.items.length >= merged.length) {
-      store.set(key, old, { ttlMs: DEGRADED_TTL, staleMs: STALE_MS });
+    // kept for the rest of its hour, not for a new one
+    const left = old ? old.at + MAX_LIFE_MS - Date.now() : 0;
+    if (old && !old.degraded && old.items.length >= merged.length && left > 0) {
+      const ttlMs = Math.min(DEGRADED_TTL, left);
+      store.set(key, old, { ttlMs, staleMs: left - ttlMs });
       return old.items;
     }
   }
-  const ttlMs = degraded ? DEGRADED_TTL : merged.length ? cfg.searchCacheMs : Math.min(EMPTY_TTL, cfg.searchCacheMs);
-  store.set(key, { items: merged, degraded }, { ttlMs, staleMs: degraded ? 0 : STALE_MS });
+  const ttlMs = Math.min(MAX_LIFE_MS, degraded ? DEGRADED_TTL : merged.length ? cfg.searchCacheMs : Math.min(EMPTY_TTL, cfg.searchCacheMs));
+  store.set(key, { items: merged, degraded, at: Date.now() }, { ttlMs, staleMs: degraded ? 0 : MAX_LIFE_MS - ttlMs });
   return merged;
 }
 
@@ -296,6 +312,8 @@ export const _test = {
   parseImgflipSearch,
   endpoints,
   breakers,
+  MAX_LIFE_MS,
+  searchCache,
   /** forget everything (cache, pauses, counters) */
   reset() {
     cache = null;

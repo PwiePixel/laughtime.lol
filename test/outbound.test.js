@@ -89,6 +89,18 @@ test('retryAfterMs reads seconds from both header styles', () => {
   assert.equal(retryAfterMs(new Headers()), null);
 });
 
+test('ttl cache: sweep removes what is past its time', async () => {
+  const cache = createTtlCache({ ttlMs: 10, max: 10 });
+  cache.set('short', 1);
+  cache.set('stale', 2, { ttlMs: 10, staleMs: 5000 });
+  cache.set('long', 3, { ttlMs: 5000 });
+  await new Promise((r) => setTimeout(r, 25));
+  assert.equal(cache.size, 3, 'nothing is removed without a read');
+  assert.equal(cache.sweep(), 2);
+  assert.equal(cache.peek('stale'), 2);
+  assert.equal(cache.get('long'), 3);
+});
+
 test('outboundFetch waits after a 429 and then succeeds', async () => {
   handlers['/limited'] = (req, res, n) => {
     if (n === 1) return sendJson(res, 429, { message: 'slow down' }, { 'Retry-After': '0.2' });

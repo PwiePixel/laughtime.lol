@@ -180,6 +180,27 @@ test('a degraded answer is only cached for a moment and never replaces a complet
   assert.deepEqual(again.map((i) => i.id), ['giphy:g1'], 'the earlier complete answer is served while the provider is down');
 });
 
+test('a search term leaves the memory within an hour, also when nobody asks for it again', async (t) => {
+  let down = false;
+  handlers['/giphy/search'] = (req, res) => (down ? sendJson(res, 500, {}) : sendJson(res, 200, { data: [giphyClip('h1', 'Hour')] }));
+  cfg.searchCacheMs = 15 * 60_000;
+  searchTest.reset();
+  t.mock.timers.enable({ apis: ['Date'], now: Date.now() });
+  await searchMedia('one hour', { kind: 'video' });
+  await searchMedia('never again', { kind: 'video' });
+  const store = searchTest.searchCache();
+  assert.ok(searchTest.MAX_LIFE_MS < 60 * 60_000);
+
+  // 30 minutes later the provider is down: the old answer helps out, but gets no new hour
+  t.mock.timers.setTime(Date.now() + 30 * 60_000);
+  down = true;
+  assert.deepEqual((await searchMedia('one hour', { kind: 'video' })).map((i) => i.id), ['giphy:h1']);
+  assert.equal(store.sweep(), 2);
+
+  t.mock.timers.setTime(Date.now() + 29 * 60_000 + 1000);
+  assert.equal(store.sweep(), 0, 'both terms are gone 59 minutes after the search');
+});
+
 test('the hourly budget stops requests before the API can complain', async () => {
   cfg.giphyHourlyLimit = 5;
   httpTest.resetBudgets();
