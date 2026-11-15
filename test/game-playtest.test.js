@@ -299,6 +299,37 @@ for (const mode of ['same', 'swap']) {
   });
 }
 
+test('the report limit holds for a guest who reconnects under a new id for every report', async () => {
+  const { players, code } = await env.room(6, { game: 'classic' });
+  const count = () => env.db.all('SELECT id FROM reports WHERE room_code = ?', code).length;
+  const reportAs = async (i, target, reason, address = 'address-of-the-guest') => {
+    const sock = env.client({ name: `G${i}` }).open();
+    sock.ws.ipHash = address;
+    sock.send({ t: 'hello', code, pid: `fresh-guest-${String(i).padStart(3, '0')}`, secret: 'secret-of-a-fresh-guest-0123456789', name: `G${i}`, avatar: 'cat|1' });
+    sock.send({ t: 'report', pid: target.pid, reason });
+    await flush(20);
+    const refused = sock.errors().includes('too_many_reports');
+    sock.drop();
+    return refused;
+  };
+
+  // the same complaint about the same player again and again: stored once
+  for (let i = 0; i < 6; i++) await reportAs(i, players[0], 'name');
+  assert.equal(count(), 1);
+
+  // different complaints from one address: it has a limit of its own
+  let refused = 0;
+  for (let i = 6; i < 40; i++) {
+    refused += (await reportAs(i, players[i % 6], ['spam', 'harassment', 'other', 'name'][Math.floor(i / 6) % 4], 'address-of-a-flooder')) ? 1 : 0;
+  }
+  assert.equal(count(), 1 + 16);
+  assert.equal(refused, 34 - 16);
+
+  // somebody at another address is not affected
+  assert.equal(await reportAs(41, players[1], 'spam', 'another-address'), false);
+  assert.equal(count(), 18);
+});
+
 test('the report limit holds for a connection that keeps changing its id', async () => {
   const { host, code } = await env.room(2, { game: 'classic' });
   const before = env.db.all('SELECT id FROM reports WHERE target_pid = ?', host.pid).length;

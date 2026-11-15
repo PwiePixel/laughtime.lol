@@ -300,10 +300,10 @@ export function kickTarget(admin, target) {
 
 const reportHits = new Map(); // reporter -> [times]
 
-function rateOk(reporterKey) {
+function rateOk(reporterKey, max = 8) {
   const t = Date.now();
   const list = (reportHits.get(reporterKey) || []).filter((x) => t - x < 10 * 60_000);
-  if (list.length >= 8) return false;
+  if (list.length >= max) return false;
   list.push(t);
   reportHits.set(reporterKey, list);
   if (reportHits.size > 5000) reportHits.clear();
@@ -336,15 +336,21 @@ export async function createReport({ reporter, target, reason, comment = '', roo
   const tKey = keyOf(target);
   if (rKey === tKey) throw new HttpError(400, 'cannot_report_self');
   if (!rateOk(rKey)) throw new HttpError(429, 'too_many_reports');
+  // A guest can take a new id with every connection, so guests are counted per
+  // address as well (twice the limit: several players may share an address).
+  const guestIp = reporter.userId ? null : reporter.ipHash || null;
+  if (guestIp && !rateOk(`ip:${guestIp}`, 16)) throw new HttpError(429, 'too_many_reports');
   // the same report twice within 30 minutes is ignored
   const dup = get(
     `SELECT id FROM reports WHERE target_key = ? AND reason = ? AND created_at > ?
-     AND ((reporter_user_id IS NOT NULL AND reporter_user_id = ?) OR (reporter_pid IS NOT NULL AND reporter_pid = ?))`,
+     AND ((reporter_user_id IS NOT NULL AND reporter_user_id = ?) OR (reporter_pid IS NOT NULL AND reporter_pid = ?)
+       OR (reporter_user_id IS NULL AND reporter_ip_hash IS NOT NULL AND reporter_ip_hash = ?))`,
     tKey,
     reason,
     Date.now() - 30 * 60_000,
     reporter.userId ?? -1,
     reporter.pid ?? '',
+    guestIp ?? '',
   );
   if (dup) return { ok: true, duplicate: true };
   const ctx = context ? await keepEvidence(context) : null;
