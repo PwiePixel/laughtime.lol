@@ -17,7 +17,7 @@ In der Discord-Activity ist all das abgeschaltet – dort gibt es keinen Service
 
 | Datei | Zweck |
 | --- | --- |
-| `public/manifest.json` | Name, Farben, Icons, Kurzbefehle (Schnelles Spiel, Privates Spiel, Beste Memes), Screenshots für den Installationsdialog |
+| `public/manifest.json` | Name, Farben, Icons, Kurzbefehle (Schnelles Spiel, Privates Spiel, Beste Memes), Screenshots für den Installationsdialog. Die Datei ist die englische Fassung; der Server liefert `/manifest.json?lang=de` mit den deutschen Texten aus `lib/locales/pwa.js` (`server/manifest.js`) |
 | `public/sw.js` | Service Worker (von Hand geschrieben, kein Build-Schritt) |
 | `public/icons/`, `public/screenshots/` | App-Icons (normal, maskable, einfarbig) und Screenshots |
 | `components/v2/PwaBoot.jsx`, `components/pwa/` | Registrierung, Installationshinweis, Update-Hinweis, Bildschirm-Sperre |

@@ -11,6 +11,7 @@ import { openDatabase } from './db.js';
 import { attachGame, createRoom, handleRoomUpload, publicStats, roomInfo, stats } from './game.js';
 import { readUpload, serveUpload, sweepRoomUploads } from './uploads.js';
 import { HttpError, checkOrigin, clientIp, createLimiter, json, readJson } from './http.js';
+import { sendManifest } from './manifest.js';
 import { queueSizes } from './matchmaking.js';
 import { activeSanction, hashIp, purgeModeration, sampleMetrics } from './moderation.js';
 import { packForGame } from './packs.js';
@@ -174,8 +175,10 @@ export async function startServer({ dev = false, dir = ROOT } = {}) {
       // Discord Activity: "/?frame_id=…" (how Discord opens it) and /activity may be framed by Discord
       const framePolicy = activityFramePolicy(p, url.searchParams);
       if (framePolicy) res.setHeader('Content-Security-Policy', framePolicy);
-      // installable web app: browsers must always get the newest worker and manifest
-      if (p === '/sw.js' || p === '/manifest.json') res.setHeader('Cache-Control', 'no-cache');
+      // installable web app: the manifest in the visitor's language, and browsers
+      // must always get the newest worker and manifest
+      if (p === '/manifest.json' && (req.method === 'GET' || req.method === 'HEAD')) return sendManifest(req, res, url.searchParams.get('lang'));
+      if (p === '/sw.js') res.setHeader('Cache-Control', 'no-cache');
       // release channel + beta gate for the layout (decided here, where the session is known)
       tagRequest(req);
       return await handle(req, res);

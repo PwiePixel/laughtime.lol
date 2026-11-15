@@ -32,8 +32,9 @@ export async function generateMetadata() {
     title: { default: translate(lang, 'meta.title'), template: '%s · laughtime.lol' },
     description: translate(lang, 'meta.description'),
     applicationName: 'LaughTime',
-    // installable web app (public/manifest.json, worker: public/sw.js)
-    manifest: '/manifest.json',
+    // installable web app (public/manifest.json, worker: public/sw.js); the address
+    // carries the language, because browsers ask for the manifest without cookies
+    manifest: '/manifest.json' + (lang === 'en' ? '' : `?lang=${lang}`),
     appleWebApp: { capable: true, title: 'LaughTime', statusBarStyle: 'black-translucent' },
     formatDetection: { telephone: false },
     openGraph: {

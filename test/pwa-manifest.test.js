@@ -135,3 +135,30 @@ test('every icon of the manifest comes from the generator', () => {
     assert.ok(generator.includes(name.split('-')[0]), `${src} is produced by scripts/generate-icons.mjs`);
   }
 });
+
+test('the manifest is served in German as well: same app, translated texts', async () => {
+  const { manifestFor } = await import('../server/manifest.js');
+  const { default: texts } = await import('../lib/locales/pwa.js');
+  assert.deepEqual(manifestFor('en'), manifest);
+  const de = manifestFor('de');
+  assert.equal(de.lang, 'de');
+  for (const key of ['name', 'short_name', 'id', 'start_url', 'scope', 'icons']) assert.deepEqual(de[key], manifest[key], key);
+  assert.notEqual(de.description, manifest.description);
+  de.shortcuts.forEach((s, i) => {
+    const en = manifest.shortcuts[i];
+    assert.deepEqual([s.url, s.icons], [en.url, en.icons]);
+    assert.ok(s.name !== en.name && s.description !== en.description, en.name);
+  });
+  de.screenshots.forEach((s, i) => {
+    const en = manifest.screenshots[i];
+    assert.deepEqual([s.src, s.sizes, s.form_factor], [en.src, en.sizes, en.form_factor]);
+    assert.notEqual(s.label, en.label, en.src);
+  });
+  // the English dictionary says what the file says
+  assert.equal(texts.en['pwa.manifest.description'], manifest.description);
+  const keys = Object.keys(texts.en).filter((k) => k.startsWith('pwa.manifest.'));
+  assert.equal(keys.length, 1 + manifest.shortcuts.length * 2 + manifest.screenshots.length);
+  for (const key of keys) assert.ok(texts.de[key] && texts.de[key] !== texts.en[key], key);
+  const english = [manifest.description, ...manifest.shortcuts.flatMap((s) => [s.name, s.description]), ...manifest.screenshots.map((s) => s.label)];
+  assert.deepEqual(keys.map((k) => texts.en[k]).sort(), [...english].sort());
+});
