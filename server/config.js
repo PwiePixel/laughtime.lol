@@ -46,6 +46,8 @@ export function getConfig() {
     maxVideoSeconds: num(e.MAX_VIDEO_SECONDS, 30),
     blockedWords: list(e.BLOCKED_WORDS, 'nsfw,nude,porn,hitler,nazi,9/11,isis,rape').map((w) => w.toLowerCase()),
 
+    // everything the server writes lives below this folder (the tests point it at a temporary one)
+    dataDir: path.join(ROOT, 'data'),
     cacheDir: path.join(ROOT, 'data', 'cache'),
     cacheMaxBytes: num(e.CACHE_MAX_MB, 800) * 1024 * 1024,
 

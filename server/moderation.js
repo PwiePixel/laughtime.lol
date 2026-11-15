@@ -4,10 +4,10 @@ import fsp from 'node:fs/promises';
 import path from 'node:path';
 import { MOD_REASONS, REPORT_REASONS, SANCTION_DURATIONS, SANCTION_TYPES, sanitizeName } from '../lib/shared.js';
 import { getUserById, isAdmin, publicUser } from './accounts.js';
-import { ROOT } from './config.js';
+import { getConfig } from './config.js';
 import { all, get, run, transaction } from './db.js';
 import { HttpError } from './http.js';
-import { UPLOAD_DIR } from './uploads.js';
+import { uploadDir } from './uploads.js';
 import { notifyModerators } from './webhook.js';
 
 // ---------------------------------------------------------------------------
@@ -47,7 +47,7 @@ function getSalt() {
     salt = process.env.MODERATION_SALT;
     return salt;
   }
-  const file = path.join(ROOT, 'data', '.moderation-salt');
+  const file = path.join(getConfig().dataDir, '.moderation-salt');
   try {
     salt = fs.readFileSync(file, 'utf8').trim();
   } catch {
@@ -316,9 +316,9 @@ async function keepEvidence(context) {
   const m = /^\/api\/uploads\/rooms\/([A-Za-z0-9_-]{16,40}\.(png|jpg|gif|webp))$/.exec(src || '');
   if (!m) return context;
   try {
-    const dir = path.join(UPLOAD_DIR, 'reports');
+    const dir = path.join(uploadDir(), 'reports');
     await fsp.mkdir(dir, { recursive: true });
-    await fsp.copyFile(path.join(UPLOAD_DIR, 'rooms', m[1]), path.join(dir, m[1]));
+    await fsp.copyFile(path.join(uploadDir(), 'rooms', m[1]), path.join(dir, m[1]));
     return { ...context, media: { ...context.media, src: `/api/uploads/reports/${m[1]}` } };
   } catch {
     return context;
@@ -630,8 +630,8 @@ export async function purgeModeration() {
   );
   if (!old.length) return;
   try {
-    for (const f of await fsp.readdir(path.join(UPLOAD_DIR, 'reports'))) {
-      if (!used.has(f)) await fsp.rm(path.join(UPLOAD_DIR, 'reports', f), { force: true });
+    for (const f of await fsp.readdir(path.join(uploadDir(), 'reports'))) {
+      if (!used.has(f)) await fsp.rm(path.join(uploadDir(), 'reports', f), { force: true });
     }
   } catch {
     /* folder missing */

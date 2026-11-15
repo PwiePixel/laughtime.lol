@@ -117,7 +117,12 @@ export function setupGame(env = {}) {
     globalThis.fetch = async () => {
       throw new Error('offline');
     };
+    // database, uploads, report evidence and caches: all in a folder of our own,
+    // never in data/ of the installation the tests are started in
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lt-game-'));
+    process.on('exit', () => fs.rmSync(dir, { recursive: true, force: true }));
+    const { getConfig } = await import('../server/config.js');
+    Object.assign(getConfig(), { dataDir: dir, cacheDir: path.join(dir, 'cache') });
     const db = await import('../server/db.js');
     await db.openDatabase(path.join(dir, 'test.db'));
     // the first pool load reads its cache files from disk: wait for it in real time,
@@ -180,9 +185,9 @@ export function setupGame(env = {}) {
       },
       /** uploads a picture in the bring phase of a swap round, like the HTTP route does */
       async upload(client, code) {
-        const { sniffImage, UPLOAD_DIR } = await import('../server/uploads.js');
+        const { sniffImage, uploadDir } = await import('../server/uploads.js');
         const res = await game.handleRoomUpload(code, client.pid, client.secret, { buf: PNG, info: sniffImage(PNG), name: `secret name of ${client.name}` });
-        ctx.uploads.push(path.join(UPLOAD_DIR, client.state.upload.mine.media.src.replace('/api/uploads/', '')));
+        ctx.uploads.push(path.join(uploadDir(), client.state.upload.mine.media.src.replace('/api/uploads/', '')));
         return res;
       },
       /** everybody leaves; empty rooms are closed and their uploaded files deleted */

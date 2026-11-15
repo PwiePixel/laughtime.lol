@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
-import { ROOT, getConfig } from './config.js';
+import { getConfig } from './config.js';
 import { all } from './db.js';
 import { HttpError } from './http.js';
 import { ensureThumb, removeThumb, thumbRel, writeThumb } from './thumbs.js';
@@ -14,7 +14,7 @@ import { ensureThumb, removeThumb, thumbRel, writeThumb } from './thumbs.js';
 // get a random name and are served with a strict content type + sandbox CSP.
 // ---------------------------------------------------------------------------
 
-export const UPLOAD_DIR = path.join(ROOT, 'data', 'uploads');
+export const uploadDir = () => path.join(getConfig().dataDir, 'uploads');
 const FOLDERS = ['packs', 'rooms'];
 const EXT = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/webp': 'webp' };
 const MIME = Object.fromEntries(Object.entries(EXT).map(([m, e]) => [e, m]));
@@ -167,18 +167,18 @@ export async function storeFile(folder, buf, info) {
   if (!FOLDERS.includes(folder)) throw new Error('bad folder');
   const id = crypto.randomBytes(15).toString('base64url');
   const rel = `${folder}/${id}.${info.ext}`;
-  const abs = path.join(UPLOAD_DIR, rel);
+  const abs = path.join(uploadDir(), rel);
   await fsp.mkdir(path.dirname(abs), { recursive: true });
   await fsp.writeFile(abs, buf, { flag: 'wx' });
   // kleine Vorschau gleich mitschreiben – das Studio lädt sonst das Original
-  await writeThumb(UPLOAD_DIR, rel, buf);
+  await writeThumb(uploadDir(), rel, buf);
   return { id, rel, url: `/api/uploads/${rel}`, thumb: `/api/uploads/t/${folder}/${id}.webp` };
 }
 
 export function removeFile(rel) {
   if (!FILE_RE.test(String(rel || ''))) return;
-  fsp.rm(path.join(UPLOAD_DIR, rel), { force: true }).catch(() => {});
-  removeThumb(UPLOAD_DIR, rel);
+  fsp.rm(path.join(uploadDir(), rel), { force: true }).catch(() => {});
+  removeThumb(uploadDir(), rel);
 }
 
 /** Adresse der Vorschau zu einer Upload-Datei ("packs/abc.gif") */
@@ -212,7 +212,7 @@ export function removeUserUploads(userId) {
 
 /** room uploads are temporary – remove old ones (e.g. after a crash) */
 export async function sweepRoomUploads(maxAgeMs = 6 * 60 * 60 * 1000) {
-  const dir = path.join(UPLOAD_DIR, 'rooms');
+  const dir = path.join(uploadDir(), 'rooms');
   let names = [];
   try {
     names = await fsp.readdir(dir);
@@ -304,7 +304,7 @@ export async function serveUpload(req, res, rel) {
     res.writeHead(404, { 'Content-Type': 'text/plain' });
     return res.end('not found');
   }
-  const abs = path.join(UPLOAD_DIR, rel);
+  const abs = path.join(uploadDir(), rel);
   // open first: a file that is deleted a moment later (replaced swap upload)
   // can still be sent completely instead of breaking the connection
   let handle;
@@ -329,7 +329,7 @@ async function serveThumb(req, res, m) {
   for (const ext of ['gif', 'png', 'jpg', 'webp']) {
     const rel = `${folder}/${id}.${ext}`;
     try {
-      await fsp.access(path.join(UPLOAD_DIR, rel));
+      await fsp.access(path.join(uploadDir(), rel));
       source = rel;
       break;
     } catch {
@@ -340,7 +340,7 @@ async function serveThumb(req, res, m) {
     res.writeHead(404, { 'Content-Type': 'text/plain', 'Cache-Control': 'no-store' });
     return res.end('not found');
   }
-  const file = await ensureThumb(UPLOAD_DIR, source);
+  const file = await ensureThumb(uploadDir(), source);
   if (!file) {
     // ohne sharp gibt es keine Vorschau – dann eben das Original
     return serveUpload(req, res, source);

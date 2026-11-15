@@ -9,7 +9,7 @@ let env;
 let uploadDir;
 before(async () => {
   env = await setupGame();
-  ({ UPLOAD_DIR: uploadDir } = await import('../server/uploads.js'));
+  uploadDir = (await import('../server/uploads.js')).uploadDir();
 });
 
 // rooms close when everybody is gone - no uploaded file may survive that
