@@ -74,7 +74,7 @@ async function main() {
   }
   if (!webhookStatus().announcements) {
     say('DISCORD_WEBHOOK_URL is not set (or not a Discord webhook URL) – nothing sent.');
-    return 0;
+    return flags.has('strict') ? 3 : 0;
   }
   if (flags.has('dry-run')) {
     say(`Dry run – would announce "${title}"${text ? ` (${text.length} characters of text)` : ''}.`);

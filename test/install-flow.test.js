@@ -269,9 +269,28 @@ test('scripts/announce.mjs is used when it exists', { skip }, (t) => {
   const res = box.run(FULL(box));
   assert.equal(res.code, 0, res.out);
   const args = JSON.parse(fs.readFileSync(path.join(box.project, 'announce-args.json'), 'utf8'));
-  assert.equal(args.length, 2);
-  assert.equal(args[0], 'LaughTime v2 is live on example.test');
+  assert.deepEqual([args.length, args[0], args[2]], [3, 'LaughTime v2 is live on example.test', '--strict']);
   assert.equal(box.calls().some((c) => c.startsWith('curl webhook')), false);
+  assert.match(res.out, /Posted to the Discord webhook/);
+  assert.match(fs.readFileSync(path.join(box.project, 'data', 'install.state'), 'utf8'), /^announced=example\.test$/m);
+});
+
+test('an announcement that was not delivered is not recorded as posted', { skip }, (t) => {
+  const box = sandbox(t);
+  fs.writeFileSync(path.join(box.project, '.env'), `PORT=3000\nDISCORD_WEBHOOK_URL=${WEBHOOK}\n`);
+  fs.mkdirSync(path.join(box.project, 'scripts'));
+  // like the real script with --strict: not delivered -> exit code 1
+  fs.writeFileSync(path.join(box.project, 'scripts', 'announce.mjs'),
+    "console.log('[announce] Announcement not delivered (failed).');\nprocess.exit(process.argv.includes('--strict') ? 1 : 0);\n");
+  const res = box.run(FULL(box));
+  assert.equal(res.code, 0, res.out);
+  assert.match(res.out, /did not accept the message/);
+  assert.doesNotMatch(res.out, /Posted to the Discord webhook/);
+  assert.doesNotMatch(fs.readFileSync(path.join(box.project, 'data', 'install.state'), 'utf8'), /^announced=/m);
+
+  // the next run tries again instead of saying "already announced"
+  const again = box.run(FULL(box));
+  assert.doesNotMatch(again.out, /already announced/);
 });
 
 test('without systemd the app and the tunnel run with PM2', { skip }, (t) => {

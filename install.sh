@@ -1794,7 +1794,8 @@ announce() {
   title="LaughTime v2 is live on $DOMAIN"
   text="LaughTime v2 ist jetzt live: https://$DOMAIN – LaughTime v2 is now live: https://$DOMAIN"
   if [[ -f "$APP_DIR/scripts/announce.mjs" ]]; then
-    (cd "$APP_DIR" && as_app "$NODE_BIN" scripts/announce.mjs "$title" "$text") >>"$LOG_SINK" 2>&1 || rc=$?
+    # --strict: anything but a delivered message is an error – only then it counts as announced
+    (cd "$APP_DIR" && as_app "$NODE_BIN" scripts/announce.mjs "$title" "$text" --strict) >>"$LOG_SINK" 2>&1 || rc=$?
   elif [[ "$hook" =~ ^https://[^[:space:]\"\\]+$ ]]; then
     # shellcheck disable=SC2016  # JavaScript template string, not a shell expansion
     payload=$("$NODE_BIN" -e 'process.stdout.write(JSON.stringify({ content: `**${process.argv[1]}**\n${process.argv[2]}` }))' "$title" "$text")
@@ -1807,7 +1808,7 @@ announce() {
     ok 'Posted to the Discord webhook'
     state_set announced "$DOMAIN"
   else
-    note 'The Discord webhook did not accept the message – the installation itself is fine.'
+    note 'The Discord webhook did not accept the message – the installation itself is fine. Check DISCORD_WEBHOOK_URL and run the script again to post it.'
   fi
 }
 
