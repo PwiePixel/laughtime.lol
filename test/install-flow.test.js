@@ -116,8 +116,10 @@ test('systemd and tunnel: units, configuration and the order of the calls', { sk
     `cloudflared tunnel route dns --overwrite-dns ${TUNNEL_ID} beta.example.test`,
     'systemctl enable --now cloudflared-laughtime.service',
     'curl https://example.test/api/status',
-  ].map((text) => callIndex(calls, text));
-  assert.deepEqual(order, [...order].sort((a, b) => a - b), calls.join('\n'));
+  ];
+  // every call is found after the one before it (the port is also asked once before the start)
+  let at = -1;
+  for (const text of order) at += 1 + callIndex(calls.slice(at + 1), text);
 
   // the authorisation link cannot be missed
   assert.match(res.out, /OPEN THIS LINK IN YOUR BROWSER[\s\S]*https:\/\/dash\.cloudflare\.com\/argotunnel\?aud=[\s\S]*Choose the zone {2}example\.test/);
@@ -192,6 +194,35 @@ test('an existing tunnel is reused and its credentials are fetched', { skip }, (
   assert.match(fs.readFileSync(box.rootFile(`etc/cloudflared/${TUNNEL_ID}.json`), 'utf8'), /fetched/);
 });
 
+test('a tunnel that runs on another server is not joined silently', { skip }, (t) => {
+  const box = sandbox(t);
+  fs.mkdirSync(path.join(box.home, '.cloudflared'), { recursive: true });
+  fs.writeFileSync(path.join(box.home, '.cloudflared', 'cert.pem'), 'cert');
+  fs.writeFileSync(path.join(box.state, 'tunnel-laughtime'), '');
+  const res = box.run(FULL(box), { STUB_TUNNEL_ORIGIN: '203.0.113.9' });
+  assert.equal(res.code, 1, res.out);
+  assert.match(res.out, /already running on another server \(connected from 203\.0\.113\.9\)/);
+  assert.match(res.out, /--tunnel-name/);
+  const calls = box.calls();
+  assert.equal(calls.some((c) => c.includes('tunnel token') || c.includes('route dns') || c.includes('cloudflared-laughtime.service')), false, calls.join('\n'));
+
+  // the same tunnel on its own server (credentials are here): a re-run is fine
+  const own = sandbox(t);
+  assert.equal(own.run(FULL(own)).code, 0);
+  const again = own.run(FULL(own), { STUB_TUNNEL_ORIGIN: '198.51.100.7' });
+  assert.equal(again.code, 0, again.out);
+  assert.doesNotMatch(again.out, /another server \(connected/);
+});
+
+test('a hostname outside the authorised zone stops the DNS step and names the stray record', { skip }, (t) => {
+  const box = sandbox(t);
+  const res = box.run(FULL(box), { STUB_DNS_WRONG_ZONE: 'example.test', STUB_PUBLIC_HTTP: '530' });
+  assert.equal(res.code, 0, res.out);
+  assert.deepEqual(box.calls().filter((c) => c.includes('route dns')).map((c) => c.split(' ').pop()), ['example.test']);
+  assert.match(res.out, /No DNS record for: example\.test www\.example\.test beta\.example\.test/);
+  assert.match(res.out, /created in the zone of the authorisation: example\.test\.other-zone\.test\. Delete it/);
+});
+
 test('DNS problems and a silent public URL are reported, not hidden', { skip }, (t) => {
   const box = sandbox(t);
   fs.writeFileSync(path.join(box.project, '.env'), `PORT=3000\nPUBLIC_URL=https://example.test\nDISCORD_WEBHOOK_URL=${WEBHOOK}\n`);
@@ -233,6 +264,59 @@ test('an unhealthy app stops the installation with its log lines', { skip }, (t)
   assert.match(res.out, /did not answer on http:\/\/127\.0\.0\.1:4321\/api\/status/);
   assert.match(res.out, /journal lines of the test double/);
   assert.equal(box.calls().some((c) => c.startsWith('cloudflared tunnel')), false, 'the tunnel was set up for a dead app');
+});
+
+test('a foreign program on the port is not mistaken for the service', { skip }, (t) => {
+  const box = sandbox(t);
+  // something answers before the unit was ever started
+  const res = box.run(FULL(box), { STUB_LOCAL_HTTP: '200' });
+  assert.equal(res.code, 1, res.out);
+  assert.match(res.out, /Port 4321 is already used by another program/);
+  assert.equal(box.calls().some((c) => c.includes('enable --now laughtime.service')), false, 'the unit was started against a taken port');
+  assert.equal(box.calls().some((c) => c.startsWith('cloudflared tunnel')), false);
+
+  // the service of this installation on the port is fine
+  const again = box.run(FULL(box));
+  assert.equal(again.code, 0, again.out);
+  assert.match(again.out, /The app answers on http:\/\/127\.0\.0\.1:4321\/api\/status/);
+});
+
+test('choices like --no-www and --no-service are remembered until the positive option is given', { skip }, (t) => {
+  const box = sandbox(t);
+  const first = box.run([...FULL(box), '--no-www', '--no-beta']);
+  assert.equal(first.code, 0, first.out);
+  const routes = () => box.calls().filter((c) => c.includes('route dns')).map((c) => c.split(' ').pop());
+  assert.deepEqual(routes(), ['example.test']);
+
+  // a plain re-run adds no hostname
+  box.clearCalls();
+  const again = box.run(['--yes', '--user', box.user, '--port', '4321']);
+  assert.equal(again.code, 0, again.out);
+  assert.deepEqual(routes(), ['example.test']);
+  assert.doesNotMatch(fs.readFileSync(box.rootFile('etc/cloudflared/laughtime.yml'), 'utf8'), /www\.|beta\./);
+
+  // the positive option brings a hostname back, the other choice stays
+  box.clearCalls();
+  const back = box.run(['--yes', '--user', box.user, '--port', '4321', '--www']);
+  assert.equal(back.code, 0, back.out);
+  assert.deepEqual(routes(), ['example.test', 'www.example.test']);
+  box.clearCalls();
+  assert.equal(box.run(['--yes', '--user', box.user, '--port', '4321']).code, 0);
+  assert.deepEqual(routes(), ['example.test', 'www.example.test']);
+
+  // no service, no tunnel: a later run and --update set up neither
+  const bare = sandbox(t);
+  assert.equal(bare.run(['--yes', '--user', bare.user, '--no-service', '--no-tunnel']).code, 0);
+  bare.clearCalls();
+  for (const args of [['--yes'], ['--update', '--yes']]) {
+    const res = bare.run(args);
+    assert.equal(res.code, 0, res.out);
+  }
+  assert.deepEqual(bare.calls().filter((c) => c.startsWith('systemctl') || c.startsWith('cloudflared') || c.startsWith('pm2')), []);
+  bare.clearCalls();
+  assert.equal(bare.run(['--yes', '--service', '--port', '4321']).code, 0);
+  assert.ok(bare.calls().some((c) => c.includes('enable --now laughtime.service')));
+  assert.equal(bare.calls().some((c) => c.startsWith('cloudflared tunnel')), false, 'the tunnel stays off');
 });
 
 test('the Discord webhook gets one message and stays secret', { skip }, (t) => {
@@ -359,6 +443,51 @@ test('a separate service account owns and runs the project', { skip: skip || (!o
   assert.equal(refused.code, 1, refused.out);
   assert.match(refused.out, /cannot reach/);
   assert.equal(fs.statSync(closed.project).uid, 0);
+});
+
+test('settings and data that belong to another account are handed over to the service user', { skip: skip || (process.getuid() !== 0 && 'needs root to create files of another account') }, (t) => {
+  const box = sandbox(t);
+  const env = path.join(box.project, '.env');
+  const db = path.join(box.project, 'data', 'laughtime.db');
+  fs.writeFileSync(env, 'PORT=3000\n', { mode: 0o600 });
+  fs.mkdirSync(path.dirname(db));
+  fs.writeFileSync(db, 'restored from a backup');
+  for (const file of [env, db]) fs.chownSync(file, 65534, 65534);
+  const before = sha256(env);
+
+  const res = box.run(FULL(box));
+  assert.equal(res.code, 0, res.out);
+  assert.match(res.out, /belong to another account/);
+  for (const file of [env, db]) assert.equal(fs.statSync(file).uid, 0, file);
+  assert.deepEqual([sha256(env), mode(env), fs.readFileSync(db, 'utf8')], [before, '600', 'restored from a backup']);
+
+  // nothing to hand over on the next run
+  assert.doesNotMatch(box.run(FULL(box)).out, /belong to another account/);
+});
+
+test('after --uninstall a new installation chooses its process manager again', { skip }, (t) => {
+  const box = sandbox(t);
+  const state = () => fs.readFileSync(path.join(box.project, 'data', 'install.state'), 'utf8');
+  assert.equal(box.run([...FULL(box), '--pm2', '--no-tunnel']).code, 0);
+  assert.match(state(), /^manager=pm2$/m);
+  assert.equal(box.run(['--uninstall', '--yes']).code, 0);
+  assert.doesNotMatch(state(), /^manager=/m);
+  box.clearCalls();
+  const res = box.run(['--yes', '--user', box.user, '--port', '4321']);
+  assert.equal(res.code, 0, res.out);
+  assert.ok(box.calls().some((c) => c.includes('enable --now laughtime.service')));
+  assert.equal(box.calls().some((c) => c.startsWith('pm2 start')), false);
+});
+
+test('a dry run reports nothing as done', { skip }, (t) => {
+  const box = sandbox(t);
+  assert.equal(box.run(FULL(box)).code, 0);
+  const res = box.run(['--uninstall', '--dry-run', '--yes']);
+  assert.equal(res.code, 0, res.out);
+  assert.doesNotMatch(res.out, /Removed /);
+  assert.doesNotMatch(res.out, /\[dry-run\] plain /);
+  assert.match(res.out, /\[dry-run\] rm -f -- .*laughtime\.service/);
+  assert.ok(fs.existsSync(box.rootFile('etc/systemd/system/laughtime.service')));
 });
 
 test('uninstall needs a clear yes, a broken checkout is noticed early', { skip }, (t) => {

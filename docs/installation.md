@@ -33,12 +33,12 @@ bash install.sh --yes --domain example.com
 | `-y`, `--yes` | keine Rückfragen, Standardwerte |
 | `--domain <d>` | öffentliche Domain (Standard: Host aus `PUBLIC_URL` in `.env`, sonst `laughtime.lol`) |
 | `--beta-domain <d>` | Beta-Adresse (Standard: `beta.<domain>`) |
-| `--no-beta` | keine Beta-Adresse |
-| `--no-www` | kein `www.<domain>` |
+| `--no-beta` | keine Beta-Adresse (wird gemerkt; `--beta` holt sie zurück) |
+| `--no-www` | kein `www.<domain>` (wird gemerkt; `--www` holt es zurück) |
 | `--port <n>` | Port der App (Standard: `SERVER_PORT` / `PORT` aus `.env`, sonst 3000) |
 | `--tunnel-name <n>` | Name des Cloudflare Tunnels (Standard: `laughtime`) |
-| `--no-tunnel` | keinen Tunnel einrichten (eigener Reverse-Proxy, siehe `deploy/nginx.example.conf`) |
-| `--no-service` | keinen Dienst einrichten, nur installieren und bauen |
+| `--no-tunnel` | keinen Tunnel einrichten (eigener Reverse-Proxy, siehe `deploy/nginx.example.conf`; wird gemerkt, `--tunnel` richtet doch einen ein) |
+| `--no-service` | keinen Dienst einrichten, nur installieren und bauen (wird gemerkt, `--service` richtet doch einen ein) |
 | `--pm2` | PM2 statt systemd verwenden |
 | `--user <name>` | Benutzerkonto, unter dem die App läuft |
 | `--no-announce` | am Ende nichts an den Discord-Webhook schicken |
@@ -47,7 +47,7 @@ bash install.sh --yes --domain example.com
 | `--dry-run` | jede Aktion nur anzeigen, nichts verändern |
 | `-h`, `--help` | Hilfe |
 
-Das Skript merkt sich Domain, Port, Tunnel-Name und Benutzer in `data/install.state`. Spätere Aufrufe, auch `--update` und `--uninstall`, brauchen die Optionen deshalb nicht noch einmal.
+Das Skript merkt sich Domain, Beta-Adresse, Port, Tunnel-Name, Benutzer, `--pm2` sowie `--no-www`, `--no-beta`, `--no-tunnel` und `--no-service` in `data/install.state`. Spätere Aufrufe, auch `--update` und `--uninstall`, brauchen die Optionen deshalb nicht noch einmal: Ein einfacher zweiter Lauf fügt nie von selbst Adressen, einen Tunnel oder einen Dienst hinzu, die vorher abgewählt waren. Zurück geht es mit der jeweiligen Gegenoption (`--www`, `--beta`, `--tunnel`, `--service`).
 
 ### Was das Skript Schritt für Schritt macht
 
@@ -58,12 +58,16 @@ Das Skript merkt sich Domain, Port, Tunnel-Name und Benutzer in `data/install.st
    - Eine vorhandene `.env` wird **niemals** verändert, überschrieben, verschoben oder angezeigt, sondern nur gelesen.
    - Fehlt sie, wird `.env.example` nach `.env` kopiert (nur für den Besitzer lesbar).
    - `data/` wird angelegt. Bitte regelmäßig sichern: Dort liegen Datenbank und Uploads.
+   - Gehören `.env` oder Dateien in `data/` einem anderen Konto als dem, unter dem die App läuft (z. B. nach dem Einspielen einer Sicherung als root), übergibt das Skript beides an dieses Konto und sagt das an. Der Inhalt bleibt unverändert.
 5. **Pakete und Build:** `npm ci`, danach `node index.js --build-only`. Das ist derselbe Build, den die App beim Start machen würde, deshalb startet der Dienst danach sofort.
 6. **Dienst:**
    - Mit systemd wird `laughtime.service` eingerichtet (Neustart nach Absturz, Start beim Booten, Logs im Journal).
    - Ohne systemd oder mit `--pm2` läuft die App als PM2-Prozess `laughtime`.
-   - Danach wartet das Skript, bis `http://127.0.0.1:<port>/api/status` antwortet.
+   - Antwortet auf dem Port schon ein anderes Programm (z. B. ein von Hand gestartetes `node index.js`), bricht das Skript mit einem Hinweis ab, statt den Dienst gegen den belegten Port zu starten.
+   - Danach wartet das Skript, bis `http://127.0.0.1:<port>/api/status` antwortet, und prüft, dass der Dienst selbst läuft.
 7. **Cloudflare Tunnel:** `cloudflared` installieren, einmalig autorisieren, Tunnel anlegen, Konfiguration schreiben, DNS-Einträge setzen, Tunnel-Dienst starten, öffentliche Adresse prüfen.
+   - **Achtung, das ist die Umschaltung:** Vorhandene DNS-Einträge für die Domain, `www` und die Beta-Adresse werden **ersetzt**. Ab diesem Moment zeigt die Domain auf diesen Server. Bei einem Umzug also vorher `data/` und `.env` übertragen. Erst ausprobieren: `bash install.sh --domain test.example.com --no-www --no-beta`.
+   - Läuft ein Tunnel mit demselben Namen schon auf einem anderen Server, macht das Skript nicht einfach mit (zwei Server am selben Tunnel teilen sich die Besucher). Für eine zweite Instanz (Test, Staging): `--tunnel-name <anderer-name>`. Für einen Umzug: den Tunnel auf dem alten Server zuerst stoppen.
 8. **Zusammenfassung:** Was läuft wo, wo liegen die Logs, wie geht Update, Neustart und Deinstallation, und ob die öffentliche Adresse wirklich von dieser Instanz beantwortet wird.
 
 Jeder Schritt prüft zuerst, was schon da ist. Du kannst das Skript jederzeit noch einmal starten. Ein zweiter Lauf startet laufende Dienste nicht neu, solange sich nichts geändert hat, es fliegt also niemand aus einer Runde. Bricht etwas ab, steht dabei, welcher Schritt es war und mit welchem Befehl es weitergeht. Das vollständige Protokoll liegt in `data/install.log`.
@@ -116,6 +120,7 @@ bash install.sh --uninstall   # Dienste und Tunnel-Konfiguration entfernen
 ```
 
 - `--update` zieht nur, wenn der Ordner ein Git-Checkout ohne lokale Änderungen ist. Sonst überspringt es den Pull und baut den vorhandenen Stand neu. Der Tunnel wird nicht angefasst.
+- Der Pull läuft unter dem Konto, dem der Ordner gehört, und fragt nie nach Benutzername, Passwort oder SSH-Schlüssel. Hat dieses Konto keinen Zugriff auf das Repository (privates Repository, Zugangsdaten nur bei root), meldet das Skript das und baut den vorhandenen Stand. Dann `git pull` selbst ausführen und `--update` noch einmal starten.
 - `--uninstall` entfernt die Dienste (systemd oder PM2), die Tunnel-Konfiguration des Skripts und seine Kopie der Tunnel-Zugangsdaten.
 - **Nie gelöscht** werden `.env`, `data/`, Node.js, `cloudflared` und der Tunnel im Cloudflare-Konto. Den Tunnel löschst du mit `cloudflared tunnel delete <name>`, die DNS-Einträge im Cloudflare-Dashboard.
 
@@ -133,15 +138,17 @@ bash install.sh --uninstall   # Dienste und Tunnel-Konfiguration entfernen
 - **Vorher ansehen, was passieren würde:** `bash install.sh --dry-run`
 - **Der Build bricht ab („Killed“):** Zu wenig Arbeitsspeicher. Skript erneut starten und die Swap-Datei erlauben.
 - **Die App antwortet nicht:** Das Skript zeigt die letzten Log-Zeilen. Häufigste Ursache ist ein belegter Port, dann `--port <n>` verwenden.
+- **„Port … is already used by another program“:** Auf dem Port läuft etwas, das nicht der Dienst dieser Installation ist, meist ein von Hand gestartetes `node index.js`. Dieses Programm beenden oder `--port <n>` wählen.
+- **„already running on another server“:** Der Tunnel-Name wird schon von einem anderen Server benutzt, siehe Schritt 7.
 - **Kein Link bei der Autorisierung oder Zeit abgelaufen:** Skript einfach noch einmal starten. Der Link kann auf jedem Gerät geöffnet werden.
-- **„No DNS record for …“:** Die Freigabe gilt für genau eine Zone, nämlich die, die beim Login gewählt wurde. Liegt die Domain in einer anderen Zone oder einem anderen Konto, `~/.cloudflared/cert.pem` löschen, Skript neu starten und die richtige Zone wählen. Alternativ im Cloudflare-Dashboard von Hand anlegen: `CNAME <hostname> → <tunnel-id>.cfargotunnel.com` (proxied).
+- **„No DNS record for …“:** Die Freigabe gilt für genau eine Zone, nämlich die, die beim Login gewählt wurde. Liegt die Domain in einer anderen Zone oder einem anderen Konto, `~/.cloudflared/cert.pem` löschen, Skript neu starten und die richtige Zone wählen. Alternativ im Cloudflare-Dashboard von Hand anlegen: `CNAME <hostname> → <tunnel-id>.cfargotunnel.com` (proxied). Liegt die Domain außerhalb der freigegebenen Zone, hat `cloudflared` dort einen nutzlosen Eintrag `<hostname>.<freigegebene Zone>` angelegt. Das Skript hört nach dem ersten solchen Eintrag auf und nennt ihn – bitte im Dashboard (DNS der anderen Zone) löschen.
 - **„answers, but not from this server yet“:** Die Domain wird noch von einem anderen Server beantwortet, z. B. durch einen alten DNS-Eintrag während eines Umzugs. Ein paar Minuten warten und das Skript erneut starten.
 - **Die öffentliche Adresse antwortet noch nicht:** Neue DNS-Einträge brauchen manchmal ein paar Minuten. Prüfen mit `curl -I https://<domain>/api/status`.
-- **Wechsel zwischen PM2 und systemd:** Erst `bash install.sh --uninstall`, dann neu installieren.
+- **Wechsel zwischen PM2 und systemd:** Erst `bash install.sh --uninstall`, dann neu installieren (mit `--pm2` für PM2, ohne für systemd).
 
 ### Discord-Meldung
 
-Ist `DISCORD_WEBHOOK_URL` in `.env` gesetzt, schickt das Skript am Ende „LaughTime v2 is live on <domain>“ (deutsch und englisch) an den Webhook. Das passiert nur, wenn die öffentliche Adresse wirklich von dieser Instanz beantwortet wird, und nur einmal pro Domain. Im interaktiven Modus fragt es vorher. Mit `--no-announce` unterbleibt die Meldung. Schlägt sie fehl, ist die Installation trotzdem in Ordnung.
+Ist `DISCORD_WEBHOOK_URL` in `.env` gesetzt, schickt das Skript am Ende „LaughTime v2 is live on <domain>“ (deutsch und englisch) an den Webhook. Das passiert nur, wenn die öffentliche Adresse wirklich von dieser Instanz beantwortet wird, und nur einmal pro Domain. Im interaktiven Modus fragt es vorher. Mit `--no-announce` unterbleibt die Meldung. Schlägt sie fehl, ist die Installation trotzdem in Ordnung; das Skript sagt das, merkt sich die Meldung nicht als gesendet und versucht es beim nächsten Lauf wieder.
 
 ### Pterodactyl
 

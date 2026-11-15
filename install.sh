@@ -67,6 +67,8 @@ WANT_WWW=1
 WANT_TUNNEL=1
 WANT_SERVICE=1
 WANT_ANNOUNCE=1
+# what this call says about them: '' = nothing, 0 = --no-…, 1 = the positive option
+OPT_BETA='' OPT_WWW='' OPT_TUNNEL='' OPT_SERVICE=''
 FORCE_PM2=0
 ORIG_ARGS=()
 
@@ -117,6 +119,8 @@ warn() { printf '  %s!%s %s\n' "$C_YELLOW" "$C_RESET" "$*"; log_line "  [warning
 note() { printf '  %s!%s %s\n' "$C_YELLOW" "$C_RESET" "$*"; log_line "  [note] $*"; }
 err()  { printf '  %sx%s %s\n' "$C_RED" "$C_RESET" "$*" >&2; log_line "  [error] $*"; }
 dry()  { printf '  %s[dry-run]%s %s\n' "$C_CYAN" "$C_RESET" "$*"; }
+# result of a change: in a dry run nothing happened, so nothing is reported as done
+did()  { (( DRY_RUN )) || ok "$@"; }
 
 step() {
   STEP_NO=$((STEP_NO + 1))
@@ -182,7 +186,7 @@ tmp_dir() {
 # command line as text, for the log and for --dry-run
 quote_cmd() {
   local prefix='' text
-  while [[ "${1:-}" =~ ^(as_root|as_app|pm2_app|git_app|npm_app|build_app)$ ]]; do
+  while [[ "${1:-}" =~ ^(as_root|as_app|plain|pm2_app|git_app|npm_app|build_app)$ ]]; do
     case "$1" in
       as_root) if (( EUID != 0 )) && [[ -z "$ROOT_PREFIX" ]]; then prefix='sudo '; fi ;;
       as_app)  if [[ "$SERVICE_USER" != "$CURRENT_USER" ]]; then prefix="(as $SERVICE_USER) "; fi ;;
@@ -413,12 +417,14 @@ Usage: bash install.sh [options]
   -y, --yes               no questions, use the defaults
       --domain <d>        public domain (default: host of PUBLIC_URL in .env, else laughtime.lol)
       --beta-domain <d>   beta hostname (default: beta.<domain>)
-      --no-beta           no beta hostname
-      --no-www            no www.<domain> hostname
+      --no-beta           no beta hostname (remembered; --beta brings it back)
+      --no-www            no www.<domain> hostname (remembered; --www brings it back)
       --port <n>          port of the app (default: SERVER_PORT / PORT in .env, else 3000)
       --tunnel-name <n>   name of the Cloudflare Tunnel (default: laughtime)
-      --no-tunnel         do not set up a Cloudflare Tunnel (own reverse proxy, see deploy/)
-      --no-service        do not set up a process manager (only install and build)
+      --no-tunnel         do not set up a Cloudflare Tunnel (own reverse proxy, see deploy/;
+                          remembered; --tunnel sets one up after all)
+      --no-service        do not set up a process manager (only install and build;
+                          remembered; --service sets one up after all)
       --pm2               use PM2 instead of systemd
       --user <name>       account that runs the app (default: the owner of this folder;
                           as root in a root-owned folder: a system user "laughtime")
@@ -462,13 +468,17 @@ parse_args() {
     case "$arg" in
       -y|--yes)       ASSUME_YES=1 ;;
       --domain)       OPT_DOMAIN=${value,,} ;;
-      --beta-domain)  OPT_BETA_DOMAIN=${value,,} ;;
-      --no-beta)      WANT_BETA=0 ;;
-      --no-www)       WANT_WWW=0 ;;
+      --beta-domain)  OPT_BETA_DOMAIN=${value,,}; [[ -n "$OPT_BETA" ]] || OPT_BETA=1 ;;
+      --no-beta)      OPT_BETA=0 ;;
+      --beta)         OPT_BETA=1 ;;
+      --no-www)       OPT_WWW=0 ;;
+      --www)          OPT_WWW=1 ;;
       --port)         OPT_PORT=$value ;;
       --tunnel-name)  OPT_TUNNEL_NAME=$value ;;
-      --no-tunnel)    WANT_TUNNEL=0 ;;
-      --no-service)   WANT_SERVICE=0 ;;
+      --no-tunnel)    OPT_TUNNEL=0 ;;
+      --tunnel)       OPT_TUNNEL=1 ;;
+      --no-service)   OPT_SERVICE=0 ;;
+      --service)      OPT_SERVICE=1 ;;
       --pm2)          FORCE_PM2=1 ;;
       --user)         OPT_USER=$value ;;
       --no-announce)  WANT_ANNOUNCE=0 ;;
@@ -561,9 +571,31 @@ reachable_by_others() {
   done
 }
 
+# A "--no-…" of an earlier run stays in force until the positive option is
+# given: a plain re-run must never add hostnames, a tunnel or a service that
+# were left out on purpose.
+choice() {   # <state key> <option of this call> -> 0 (off) or 1 (on)
+  if [[ -n "$2" ]]; then printf '%s' "$2"
+  elif [[ "$(state_get "$1")" == 1 ]]; then printf 0
+  else printf 1
+  fi
+}
+
+save_choice() {   # <state key> <option of this call>
+  case "$2" in
+    0) state_set "$1" 1 ;;
+    1) state_set "$1" '' ;;
+  esac
+}
+
 load_settings() {
   local src=$ENV_FILE public_url host remembered
   [[ -f "$src" ]] || src="$APP_DIR/.env.example"
+
+  WANT_BETA=$(choice no_beta "$OPT_BETA")
+  WANT_WWW=$(choice no_www "$OPT_WWW")
+  WANT_TUNNEL=$(choice no_tunnel "$OPT_TUNNEL")
+  WANT_SERVICE=$(choice no_service "$OPT_SERVICE")
 
   public_url=$(env_get PUBLIC_URL "$src")
   host=$(host_of_url "$public_url"); host=${host#www.}
@@ -794,14 +826,18 @@ step_packages() {
 # step: update (git pull)
 # ---------------------------------------------------------------------------
 git_app() {
-  local owner
+  local owner home ssh_cmd
+  local -a as=(env)
   owner=$(stat -c %U "$APP_DIR")
   # git refuses to work in a checkout that belongs to somebody else
   if (( EUID == 0 )) && [[ "$owner" != root && "$owner" != UNKNOWN ]] && have runuser; then
-    runuser -u "$owner" -- git -C "$APP_DIR" "$@"
-  else
-    git -C "$APP_DIR" "$@"
+    home=$(home_of "$owner")
+    as=(runuser -u "$owner" -- env "HOME=${home:-/}")
   fi
+  # Never ask for a user name, a password or a host key: the question would
+  # sit behind the progress line for ever. Without access git fails at once.
+  ssh_cmd=${GIT_SSH_COMMAND:-$("${as[@]}" git -C "$APP_DIR" config --get core.sshCommand 2>/dev/null || true)}
+  "${as[@]}" GIT_TERMINAL_PROMPT=0 "GIT_SSH_COMMAND=${ssh_cmd:-ssh} -oBatchMode=yes" git -C "$APP_DIR" "$@"
 }
 
 step_update_source() {
@@ -818,7 +854,7 @@ step_update_source() {
   fi
   before=$(sha256_of "$APP_DIR/install.sh")
   if ! run_logged 'git pull' git_app pull --ff-only; then
-    warn 'git pull failed (see above) – continuing with the current source.'
+    warn "git pull failed (see above) – continuing with the current source. If the account \"$(stat -c %U "$APP_DIR")\" that owns the folder has no access to the repository (no saved login, no SSH key), run \"git pull\" yourself and then --update again."
     return 0
   fi
   (( DRY_RUN )) && return 0
@@ -961,6 +997,23 @@ create_service_user() {
   ok "System user \"$SERVICE_USER\" created (home: $SERVICE_HOME, no login)"
 }
 
+# .env and data/ restored from a backup or copied with sudo can belong to
+# another account. The service could then neither read its settings nor write
+# its database – also as root, because the unit runs without override rights.
+hand_over_foreign_files() {
+  local first
+  local -a paths=()
+  if [[ -e "$ENV_FILE" ]]; then paths+=("$ENV_FILE"); fi
+  if [[ -d "$DATA_DIR" ]]; then paths+=("$DATA_DIR"); fi
+  (( ${#paths[@]} )) || return 0
+  first=$(find "${paths[@]}" ! -user "$SERVICE_USER" -print -quit 2>/dev/null) || true
+  [[ -n "$first" ]] || return 0
+  note "Files of the installation belong to another account than \"$SERVICE_USER\" (e.g. $first) – .env and data/ are handed over, their content stays as it is."
+  quiet as_root chown -Rh "$SERVICE_USER:$SERVICE_GROUP" "${paths[@]}" \
+    || die "Could not change the owner. Run: ${SUDO_HINT}chown -R $SERVICE_USER:$SERVICE_GROUP $ENV_FILE $DATA_DIR"
+  ok ".env and data/ now belong to $SERVICE_USER"
+}
+
 step_project() {
   local trust
   step 'Project files and settings'
@@ -1011,11 +1064,12 @@ step_project() {
     note "The app runs as \"$SERVICE_USER\", so the project folder is handed over to that account."
     quiet as_root chown -R "$SERVICE_USER:$SERVICE_GROUP" "$APP_DIR" || die "Could not change the owner of $APP_DIR."
     OWNER_REF=$(stat -c %u:%g "$APP_DIR")
-    ok "Owner of $APP_DIR is now $SERVICE_USER"
+    did "Owner of $APP_DIR is now $SERVICE_USER"
   fi
   if (( ROOT_FALLBACK )); then
     warn "The app will run as root, because no other account can reach $APP_DIR. Safer: move the project to /opt/laughtime and run the script again there."
   fi
+  if (( ! DRY_RUN )) && [[ "$MANAGER" != none ]]; then hand_over_foreign_files; fi
   if (( ! DRY_RUN )); then
     as_app test -w "$APP_DIR" 2>/dev/null || die "The user \"$SERVICE_USER\" cannot write to $APP_DIR. Choose the owner of the folder with --user, or move the project to a folder that account can reach (e.g. /opt/laughtime)."
     if [[ -n "$NODE_BIN" ]]; then
@@ -1213,7 +1267,7 @@ render_tunnel_unit() {
 systemd_apply() {   # <unit name> <content> <restart needed 0|1>
   local unit=$1 content=$2 restart=$3
   if install_file "/etc/systemd/system/$unit" 644 "$content"; then
-    ok "Unit $unit written"
+    did "Unit $unit written"
     quiet as_root systemctl daemon-reload || die 'systemctl daemon-reload failed.'
     restart=1
   else
@@ -1328,6 +1382,29 @@ wait_for_http() {   # <url> <timeout seconds> <label> [extra curl options...]
   return 0
 }
 
+# is the app's own service (unit or PM2 process) up?
+service_is_up() {
+  case "$MANAGER" in
+    systemd) as_root systemctl is-active --quiet "$SERVICE_NAME" 2>/dev/null ;;
+    pm2)     pm2_running "$APP_NAME" ;;
+    *)       return 1 ;;
+  esac
+}
+
+# does anything speak HTTP on this address (whatever the status)?
+port_answers() {   # <url>
+  local code
+  code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 4 --noproxy '*' "$1" 2>/dev/null) || true
+  [[ -n "$code" && "$code" != 000 ]]
+}
+
+# A program that is not our service already holds the port (a "node index.js"
+# started by hand, an old process): the service could never bind it and would
+# restart for ever, while the health check talks to the stranger.
+foreign_on_port() {   # <health url>
+  die "Port $PORT is already used by another program: something answers on $1, but it is not the ${MANAGER} service of this installation. Stop that program (e.g. a \"node index.js\" started by hand) or choose another port with --port <n>, then run the script again."
+}
+
 step_service() {
   local restart=0 health="http://$LOCAL_HOST:$PORT/api/status" unit
   step "Process manager ($MANAGER)"
@@ -1336,6 +1413,7 @@ step_service() {
   if [[ "$MANAGER" == systemd ]]; then
     [[ "$APP_DIR" =~ ^/[A-Za-z0-9_./@+,-]*$ ]] || die "The project path \"$APP_DIR\" contains characters a systemd unit cannot handle safely (spaces, quotes, …). Move the project, e.g. to /opt/laughtime."
     unit=$(render_app_unit) || die 'Could not read the unit template deploy/laughtime.service.'
+    if (( ! DRY_RUN )) && ! service_is_up && port_answers "$health"; then foreign_on_port "$health"; fi
     systemd_apply "$SERVICE_NAME" "$unit" "$restart" || {
       show_app_logs
       die "Could not start $SERVICE_NAME – see the log lines above (${SUDO_HINT}journalctl -u ${SERVICE_NAME%.service} -e)."
@@ -1344,6 +1422,7 @@ step_service() {
     ensure_pm2
     PM2_ENV=(NODE_ENV=production)
     (( ! PORT_OVERRIDE )) || PM2_ENV+=("SERVER_PORT=$PORT")
+    if (( ! DRY_RUN )) && ! service_is_up && port_answers "$health"; then foreign_on_port "$health"; fi
     pm2_apply "$APP_NAME" "$restart" "$APP_DIR/index.js" --cwd "$APP_DIR" \
       --interpreter "$NODE_BIN" --time --restart-delay 5000 --kill-timeout 20000 \
       || { show_app_logs; die "Could not start the PM2 process \"$APP_NAME\"."; }
@@ -1356,6 +1435,12 @@ step_service() {
     return 0
   fi
   if wait_for_http "$health" "$HEALTH_TIMEOUT" 'Waiting for the app (the first start may take a moment)' --noproxy '*'; then
+    # an answer alone proves nothing while the service itself is down
+    if ! service_is_up; then
+      APP_STATUS='not running'
+      show_app_logs
+      foreign_on_port "$health"
+    fi
     ok "The app answers on $health"
     APP_STATUS='running'
   else
@@ -1530,7 +1615,8 @@ cf_login() {
   ok "Authorised – certificate saved as $cert"
 }
 
-# id of the tunnel with our name, empty when there is none
+# id of the tunnel with our name, empty when there is none; a second line
+# names where the tunnel is connected from right now (empty: nowhere)
 cf_find_tunnel() {
   local json
   json=$("$CLOUDFLARED_BIN" tunnel list --output json --name "$TUNNEL_NAME" 2>>"$LOG_SINK") || return 1
@@ -1541,12 +1627,16 @@ cf_find_tunnel() {
       try { list = JSON.parse(text) || []; } catch { process.exit(3); }
       const live = (t) => !t.deleted_at || String(t.deleted_at).startsWith("0001");
       const hit = list.find((t) => t && t.name === process.argv[1] && live(t));
-      if (hit) console.log(hit.id);
+      if (!hit) return;
+      console.log(hit.id);
+      const conns = Array.isArray(hit.connections) ? hit.connections : [];
+      const ips = [...new Set(conns.map((c) => String((c && c.origin_ip) || "")).filter((ip) => /^[0-9a-fA-F.:]+$/.test(ip)))];
+      console.log(conns.length ? ips.join(", ") || "unknown address" : "");
     });' "$TUNNEL_NAME"
 }
 
 cf_tunnel() {
-  local cf_home creds
+  local cf_home creds found live=''
   cf_home=$(dirname "$(cf_cert_path)")
   if (( DRY_RUN )) && { [[ ! -s "$(cf_cert_path)" ]] || ! have cloudflared || ! have node; }; then
     dry "cloudflared tunnel list --output json --name $TUNNEL_NAME   (reuse the tunnel when it exists)"
@@ -1554,8 +1644,19 @@ cf_tunnel() {
     TUNNEL_ID='<tunnel-id>'
     return 0
   fi
-  TUNNEL_ID=$(cf_find_tunnel) || die "cloudflared could not list the tunnels of the account (details: $LOG_FILE). If the authorisation was revoked, delete $(cf_cert_path) and run the script again."
+  found=$(cf_find_tunnel) || die "cloudflared could not list the tunnels of the account (details: $LOG_FILE). If the authorisation was revoked, delete $(cf_cert_path) and run the script again."
+  TUNNEL_ID=${found%%$'\n'*}
+  if [[ "$found" == *$'\n'* ]]; then live=${found#*$'\n'}; fi
   if [[ -n "$TUNNEL_ID" ]]; then
+    # Connected from somewhere while this server never had its credentials: the
+    # tunnel runs on another server. Joining it would make this one a second
+    # connector – Cloudflare then spreads the visitors over both servers.
+    if [[ -n "$live" && ! -s "$cf_home/$TUNNEL_ID.json" && ! -s "$(dst "$(dirname "$CF_CONFIG")/$TUNNEL_ID.json")" ]]; then
+      note "The tunnel \"$TUNNEL_NAME\" is already running on another server (connected from $live). A second server on the same tunnel shares its visitors: some would land here, some there."
+      if (( ! INTERACTIVE )) || ! confirm 'Use this tunnel on this server anyway (only when the other server is being shut down)?' n; then
+        die "Nothing was changed at the tunnel. For a separate instance (staging, test) use another name: --tunnel-name <name>. For a move: stop the tunnel on the old server first, then run the script again."
+      fi
+    fi
     ok "Tunnel \"$TUNNEL_NAME\" exists ($TUNNEL_ID) – using it"
   elif (( DRY_RUN )); then
     dry "cloudflared tunnel create $TUNNEL_NAME"
@@ -1564,6 +1665,7 @@ cf_tunnel() {
   else
     quiet "$CLOUDFLARED_BIN" tunnel create "$TUNNEL_NAME" || die "cloudflared tunnel create $TUNNEL_NAME failed (details: $LOG_FILE)."
     TUNNEL_ID=$(cf_find_tunnel) || TUNNEL_ID=''
+    TUNNEL_ID=${TUNNEL_ID%%$'\n'*}
     [[ -n "$TUNNEL_ID" ]] || die "The tunnel \"$TUNNEL_NAME\" was created, but it does not show up in the tunnel list (details: $LOG_FILE)."
     ok "Tunnel \"$TUNNEL_NAME\" created ($TUNNEL_ID)"
   fi
@@ -1648,9 +1750,11 @@ cf_config() {
 }
 
 cf_dns() {
-  local host out rc pattern
+  local host out rc pattern stray='' wrong_zone=0
   DNS_FAILED=()
   for host in "${HOSTNAMES[@]}"; do
+    # the same would happen to every other name: do not litter the wrong zone
+    if (( wrong_zone )); then DNS_FAILED+=("$host"); continue; fi
     if (( DRY_RUN )); then dry "cloudflared tunnel route dns --overwrite-dns $TUNNEL_NAME $host"; continue; fi
     rc=0
     log_line "\$ cloudflared tunnel route dns --overwrite-dns $TUNNEL_ID $host"
@@ -1665,6 +1769,8 @@ cf_dns() {
       printf '%s\n' "$out" | tail -n 4 | sed 's/^/      /' >&2
     elif printf '%s' "$out" | grep -qiE -- "$pattern"; then
       DNS_FAILED+=("$host")
+      wrong_zone=1
+      stray=$(printf '%s' "$out" | grep -oiE -- "${host//./\\.}\\.[a-z0-9.-]*[a-z0-9]" | head -n 1) || stray=''
       err "DNS record for $host landed in another zone:"
       printf '%s\n' "$out" | tail -n 2 | sed 's/^/      /' >&2
     else
@@ -1673,6 +1779,9 @@ cf_dns() {
   done
   if (( ${#DNS_FAILED[@]} )); then
     warn "No DNS record for: ${DNS_FAILED[*]}. The authorisation (cert.pem) is valid for exactly one zone – the one chosen at the login. If the domain is in another zone or account: delete $(cf_cert_path), run the script again and choose the right zone. Or create the record by hand in the Cloudflare dashboard: CNAME <hostname> -> $TUNNEL_ID.cfargotunnel.com (proxied)."
+    if (( wrong_zone )); then
+      warn "A record that helps nobody was created in the zone of the authorisation: ${stray:-<hostname>.<that zone>}. Delete it in the Cloudflare dashboard (DNS of that zone)."
+    fi
   fi
 }
 
@@ -1911,7 +2020,7 @@ uninstall() {
       quiet as_root systemctl disable --now "$unit" || true
     fi
     quiet as_root rm -f -- "$target"
-    ok "Removed $unit"
+    did "Removed $unit"
     removed=1
   done
   if (( removed )) && [[ "$INIT" == systemd ]]; then quiet as_root systemctl daemon-reload || true; fi
@@ -1922,7 +2031,7 @@ uninstall() {
     for unit in "$APP_NAME" "cloudflared-$TUNNEL_NAME"; do
       if pm2_app describe "$unit" >/dev/null 2>&1; then
         quiet pm2_app delete "$unit" || true
-        ok "Removed the PM2 process \"$unit\""
+        did "Removed the PM2 process \"$unit\""
         removed=1
       fi
     done
@@ -1949,11 +2058,13 @@ uninstall() {
     if [[ "$(dirname "$conf")" != "$cf_home" && "$id" =~ ^[0-9a-fA-F-]{36}$ && -f "$creds" ]]; then
       quiet "$writer" rm -f -- "$creds"
     fi
-    ok "Removed the tunnel configuration $conf"
+    did "Removed the tunnel configuration $conf"
     removed=1
   done
 
   (( removed )) || ok 'Nothing of this installation was found – nothing to remove'
+  # the next installation chooses its process manager anew (systemd where it exists)
+  state_set manager ''
   say ''
   info 'Still there, on purpose:'
   info "  $ENV_FILE and $DATA_DIR (your settings and data)"
@@ -1989,15 +2100,17 @@ print_plan() {
   case "$MANAGER" in
     systemd) say "    Service   systemd unit $SERVICE_NAME, user $SERVICE_USER$created" ;;
     pm2)     say "    Service   PM2 process \"$APP_NAME\", user $SERVICE_USER$created" ;;
-    *)       say '    Service   none (--no-service)' ;;
+    *)       say '    Service   none (--no-service; set one up with --service)' ;;
   esac
   say "    Port      $PORT$port_note"
   if [[ "$MODE" == update ]]; then
     say '    Mode      update: pull, reinstall, rebuild, restart (the tunnel is not touched)'
   elif (( WANT_TUNNEL )); then
     say "    Tunnel    Cloudflare Tunnel \"$TUNNEL_NAME\" -> ${HOSTNAMES[*]}"
+    say '              Existing DNS records of these names are replaced: this run switches them to'
+    say '              this server. To try it first: --domain test.example.com --no-www --no-beta'
   else
-    say '    Tunnel    none (--no-tunnel)'
+    say '    Tunnel    none (--no-tunnel; set one up with --tunnel)'
   fi
   (( ! DRY_RUN )) || say "    ${C_CYAN}Dry run: every action is only printed, nothing is changed.${C_RESET}"
   say ''
@@ -2069,6 +2182,10 @@ main() {
 
   if (( FORCE_PM2 )); then state_set manager pm2; fi
   if [[ -n "$OPT_USER" ]]; then state_set user "$SERVICE_USER"; fi
+  save_choice no_beta "$OPT_BETA"
+  save_choice no_www "$OPT_WWW"
+  save_choice no_tunnel "$OPT_TUNNEL"
+  save_choice no_service "$OPT_SERVICE"
   if [[ -n "$OPT_PORT" ]]; then
     # only a port that differs from .env has to be remembered
     if (( PORT_OVERRIDE )); then state_set port "$PORT"; else state_set port ''; fi

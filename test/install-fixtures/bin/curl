@@ -17,7 +17,10 @@ if [ "$config" = 1 ]; then
 fi
 echo "curl $url" >>"$STUB_LOG"
 case "$url" in
-  http://127.0.0.1:*|http://localhost:*) code="${STUB_LOCAL_HTTP:-200}" uptime="${STUB_LOCAL_UPTIME:-42}" ;;
+  http://127.0.0.1:*|http://localhost:*)
+    # the port only answers while the app's service runs – unless a test puts something else there
+    if [ -e "$STUB_STATE/active-laughtime.service" ] || [ -e "$STUB_STATE/pm2-laughtime" ]; then code=200; else code=000; fi
+    code="${STUB_LOCAL_HTTP:-$code}" uptime="${STUB_LOCAL_UPTIME:-42}" ;;
   https://*/api/status) code="${STUB_PUBLIC_HTTP:-200}" uptime="${STUB_PUBLIC_UPTIME:-42}" ;;
   *) echo "unexpected download in a test: $url" >&2; exit 22 ;;
 esac
